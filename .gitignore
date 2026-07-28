@@ -1,0 +1,8 @@
+.DS_Store
+node_modules
+.opencode/knowledge
+.opencode/references
+.opencode/scripts
+.opencode/skills
+dist
+opencode-dev-team-*.tgz
