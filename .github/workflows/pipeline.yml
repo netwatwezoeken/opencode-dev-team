@@ -13,6 +13,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   check:
@@ -42,5 +43,17 @@ jobs:
       - name: Test
         run: mise run test
 
-      - name: Build
-        run: mise run build
+      - name: Set up Node registry
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      # setup-node ships an older bundled npm; OIDC Trusted Publishing needs
+      # npm >= 11.5.1. Upgrade before publishing or the registry rejects the
+      # tokenless publish with a misleading E404.
+      - name: Upgrade npm for OIDC publishing
+        run: npm install -g npm@latest
+
+      - name: Publish
+        run: mise run publish --tag latest

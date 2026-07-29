@@ -1,7 +1,7 @@
 {
   "name": "opencode-dev-team",
-  "version": "0.0.1-aplha001",
-  "description": "{{description}}",
+  "version": "0.0.1-alpha003",
+  "description": "An opencode agentic dev team.",
   "author": {
     "name": "Jos Hendriks",
     "email": "jos@netwatwezoeken.nl"
@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "{{repositoryUrl}}"
+    "url": "https://github.com/netwatwezoeken/opencode-dev-team"
   },
   "publishConfig": {
     "access": "public"
