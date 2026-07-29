@@ -7,12 +7,6 @@ color: >-
 model: github-copilot/claude-opus-4.8
 ---
 
-# Agent-Assisted Specification
-
-Role: orchestrator. This command produces specification artifacts and gates
-progression to `/plan` — it does not write implementation code, author
-per-slice Gherkin scenarios, or begin building.
-
 ## Positioning — what this agent is for
 
 This skill's value is **resolving ambiguity with a human before build begins**. No downstream workflow recovers information the spec never stated — under vague specs every workflow arm scored
@@ -195,6 +189,15 @@ All gap and ambiguity findings from the Ambiguity Resolution Protocol, with thei
 
 1. **Print** the file path to chat so the user can find it.
 
-### Auto-trigger /plan
+### Trigger next step
 
-After persisting, automatically invoke `/plan` with the feature description. The plan command discovers the spec artifacts, decomposes the feature into vertical slices, and authors the Gherkin scenarios for each slice. Do not ask first — the approved spec is the trigger.
+After persisting, automatically invoke `/plan` with the feature description. 
+
+When the user has **explicitly approved** the spec, call `workflow_advance` with:
+- `approve: true`
+- `current: "specs"`
+- `reference: "<path and filname of created spec>"`
+
+Do NOT call `workflow_advance` until the user has confirmed the spec is correct.
+
+"Plan" is the next step is discovers the spec artifacts, decomposes the feature into vertical slices, and authors the Gherkin scenarios for each slice. Do not ask first — the approved spec is the trigger.

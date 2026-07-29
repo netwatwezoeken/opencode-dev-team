@@ -21,13 +21,7 @@
     "access": "public"
   },
   "files": [
-    "dist",
-    "src/agents",
-    "src/commands",
-    "src/knowledge",
-    "src/references",
-    "src/scripts",
-    "src/skills"
+    "dist"
   ],
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -43,7 +37,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "^1.17.13",
+    "@opencode-ai/plugin": "^1.18.8",
     "gray-matter": "^4.0.3"
   }
 }

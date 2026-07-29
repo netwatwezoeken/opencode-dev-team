@@ -2,7 +2,6 @@
 * Based on config-hook from https://github.com/yuhp/opencode-models-discovery
 * Licensed under MIT.
 */
-import { ToastNotifier } from './toast-notifier'
 //import { validateConfig } from '../utils/validation'
 //import { enhanceConfig } from './enhance-config'
 //import { hasLegacyGlobalDiscoveryConfig } from '../types/plugin-config'
@@ -87,7 +86,7 @@ export function configHook(
         description: data.description,
         agent: data.agent,
         template: content,
-        model: 'github-copilot/claude-sonnet-4.6',
+        model: data.model
       }
 
       await addCommand(config, logger, commandName, command, state)

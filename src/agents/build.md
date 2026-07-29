@@ -9,7 +9,6 @@ description: >-
 mode: primary
 color: >-
   #569cd6
-argument-hint: "[--plan <path>] [--yes]"
 ---
 
 # Build
