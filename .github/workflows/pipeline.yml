@@ -3,6 +3,7 @@ name: Pipeline
 on:
   push:
     branches: [main]
+    tags: ['*']
   pull_request:
     branches: [main]
 
@@ -42,6 +43,32 @@ jobs:
 
       - name: Test
         run: mise run test
+
+  publish:
+    name: Publish
+    needs: check
+    # Only publish on a git tag push; the tag is used as the package version.
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Installs the toolchain pinned in mise.toml (bun 1.3.2, etc.) and
+      # caches it, so CI runs the exact same versions as local dev.
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+          cache: true
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Use the git tag as the package version. The tag is taken as-is
+      # (no leading 'v' is stripped), so tags must be valid semver.
+      - name: Set version from git tag
+        run: npm version "${GITHUB_REF_NAME}" --no-git-tag-version --allow-same-version
 
       - name: Set up Node registry
         uses: actions/setup-node@v4
