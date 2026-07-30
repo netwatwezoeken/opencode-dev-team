@@ -113,7 +113,7 @@ export function configHook(
       const agent: AgentConfig = {
         description: data.description,
         agent: data.agent,
-        template: content,
+        prompt: content,
         mode: data.mode,
         color: data.color,
         model: data.model
