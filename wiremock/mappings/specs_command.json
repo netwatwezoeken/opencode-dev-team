@@ -1,0 +1,41 @@
+{
+  "mappings": [
+    {
+      "name": "v1_chat_completions_single_first",
+      "scenarioName": "specs-single",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "SpecsStarted",
+      "request": {
+        "url": "/v1/chat/completions",
+        "method": "POST"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "workflow_start-specs.json",
+        "headers": {
+          "Content-Type": "text/event-stream; charset=utf-8"
+        }
+      },
+      "persistent": true,
+      "insertionIndex": 2
+    },
+    {
+      "name": "v1_chat_completions_single_after",
+      "scenarioName": "specs-single",
+      "requiredScenarioState": "SpecsStarted",
+      "request": {
+        "url": "/v1/chat/completions",
+        "method": "POST"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "done.json",
+        "headers": {
+          "Content-Type": "text/event-stream; charset=utf-8"
+        }
+      },
+      "persistent": true,
+      "insertionIndex": 2
+    }
+  ]
+}

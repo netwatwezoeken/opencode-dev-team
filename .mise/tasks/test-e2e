@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Run e2e tests (starts WireMock via Docker, drives opencode headlessly)"
+#MISE depends=["typecheck"]
+set -euo pipefail
+
+vitest run --config vitest.e2e.config.ts

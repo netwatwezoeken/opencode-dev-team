@@ -66,7 +66,7 @@ export function configHook(
     )*/
 
     const commandsDir = join(__dirname, "commands")
-    const REQUIRED_COMMAND_FIELDS = ["description", "agent"] as const
+    const REQUIRED_COMMAND_FIELDS = ["description"] as const
 
     for (const file of readdirSync(commandsDir).filter(f => f.endsWith(".md"))) {
       const commandName = file.replace(/\.md$/, "")

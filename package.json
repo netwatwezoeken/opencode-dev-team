@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": "^1.18.8",
+    "@opencode-ai/sdk": "^1.18.8",
     "gray-matter": "^4.0.3"
   }
 }
