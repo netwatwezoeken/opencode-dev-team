@@ -1,6 +1,6 @@
 # Opencode dev team
 
-An agentic development team for [opencode](https://opencode.ai), delivered as an opencode plugin. It orchestrates a disciplined **`/specs` → `/plan` → `/build`** workflow with dedicated agents for each phase, a shared knowledge base, and built-in quality gates.
+An agentic development team for [opencode](https://opencode.ai), delivered as an opencode plugin. It orchestrates a disciplined **`/specs` → `/planner` → `/builder`** workflow with dedicated agents for each phase, a shared knowledge base, and built-in quality gates.
 
 > **This project is an opencode port of Bryan Finster's [Agentic Dev Team](https://github.com/bdfinst/agentic-dev-team).**
 > The original is built for Claude Code; this repository adapts that same specs-driven, human-in-the-loop workflow and the underlying engineering discipline to run natively inside opencode as a plugin. All credit for the original concept, workflow design, and knowledge base goes to [Bryan Finster (bdfinst)](https://github.com/bdfinst).
@@ -15,7 +15,7 @@ The plugin installs a three-phase workflow that keeps a human in the loop at eve
 | Phase | Agent | Purpose |
 |-------|-------|---------|
 | **Specs** | `specs` | Collaboratively produce three specification artifacts — Intent, Architecture, and Acceptance Criteria — and resolve ambiguity with a human *before* any implementation. Enforces a hard consistency gate. |
-| **Plan** | `plan` | Decompose the feature into vertical slices, author per-slice Gherkin scenarios, sequence the work into parallelizable waves, and run plan-review personas before human approval. |
+| **Plan** | `planner` | Decompose the feature into vertical slices, author per-slice Gherkin scenarios, sequence the work into parallelizable waves, and run plan-review personas before human approval. |
 | **Build** | `build` | Execute the approved plan in small per-behavior batches (IMPLEMENT → TEST → REFACTOR), with inline review checkpoints, runtime verification, and test-quality scoring before opening a PR. |
 
 Each phase hands off to the next only after explicit human approval, via the `workflow_advance` tool. The workflow can be started with the `/specs` command.
@@ -34,7 +34,7 @@ Start the workflow from within opencode:
 /specs <name of the new feature>
 ```
 
-The specs agent guides you through producing and approving the specification artifacts (persisted to `docs/specs/<slug>.md`). Once approved, it hands off to `/plan`, which decomposes the work and produces a plan under `plans/`. After the plan is approved, `/build` implements it slice by slice.
+The specs agent guides you through producing and approving the specification artifacts (persisted to `docs/specs/<slug>.md`). Once approved, it hands off to `/planner`, which decomposes the work and produces a plan under `plans/`. After the plan is approved, `/builder` implements it slice by slice.
 
 ## Development
 

@@ -1,12 +1,12 @@
 import { type PluginInput, tool } from '@opencode-ai/plugin';
 import type { Logger } from './logger';
 
-export type Step = 'specs' | 'plan' | 'build';
+export type Step = 'specs' | 'planner' | 'builder';
 
 export const NEXT: Record<Step, Step | null> = {
-  specs: 'plan',
-  plan: 'build',
-  build: null,
+  specs: 'planner',
+  planner: 'builder',
+  builder: null,
 };
 
 /**
@@ -16,8 +16,8 @@ export const NEXT: Record<Step, Step | null> = {
  */
 export const MODEL: Record<Step, { providerID: string; modelID: string }> = {
   specs: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
-  plan: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
-  build: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
+  planner: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
+  builder: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
 };
 
 /**
@@ -26,12 +26,12 @@ export const MODEL: Record<Step, { providerID: string; modelID: string }> = {
  * so the next agent can read it directly.
  */
 export const HANDOFF: Record<Exclude<Step, 'specs'>, string> = {
-  plan: [
+  planner: [
     'The spec above has been approved by the user.',
     'You are now the Plan step.',
     'Read the approved spec from: ',
   ].join(' '),
-  build: [
+  builder: [
     'The plan above has been approved by the user.',
     'You are now the BUILD step.',
     'Read the approved plan from the conversation history and implement it.',
@@ -57,7 +57,7 @@ export function workflowTools(client: PluginInput['client'], logger: Logger) {
           'Set to true only when the user has explicitly approved the current step.'
         ),
         current: tool.schema
-          .enum(['specs', 'plan', 'build'])
+          .enum(['specs', 'planner', 'builder'])
           .describe('The step that is being approved.'),
         reference: tool.schema
           .string()
@@ -109,7 +109,7 @@ export function workflowTools(client: PluginInput['client'], logger: Logger) {
       description: 'Report which workflow step is currently active.',
       args: {
         current: tool.schema
-          .enum(['specs', 'plan', 'build'])
+          .enum(['specs', 'planner', 'builder'])
           .describe('The step you believe is currently active.'),
       },
       async execute({ current }) {
@@ -125,7 +125,7 @@ export function workflowTools(client: PluginInput['client'], logger: Logger) {
       description: 'Start the workflow.',
       args: {
         start: tool.schema
-          .enum(['specs', 'plan', 'build'])
+          .enum(['specs', 'planner', 'builder'])
           .describe('The step to start from.'),
       },
       async execute({ start }, ctx) {

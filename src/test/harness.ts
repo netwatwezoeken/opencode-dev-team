@@ -275,16 +275,20 @@ async function waitForSessionIdle(
   throw new Error(`Timed out polling session idle after ${timeoutMs}ms`);
 }
 
-/**
- * List the commands opencode has loaded (GET /command). Useful to verify a
- * command exists before dispatching it.
- */
 export async function listCommands(client: OpencodeClient): Promise<string[]> {
   const result = await client.command.list();
   if (result.error) {
     throw new Error(`GET /command failed: ${JSON.stringify(result.error)}`);
   }
   return (result.data ?? []).map((command) => command.name);
+}
+
+export async function listAgents(client: OpencodeClient): Promise<string[]> {
+  const result = await client.app.agents();
+  if (result.error) {
+    throw new Error(`GET /agent failed: ${JSON.stringify(result.error)}`);
+  }
+  return (result.data ?? []).map((agent) => agent.name);
 }
 
 /**

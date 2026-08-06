@@ -14,7 +14,7 @@ const DevTeamPlugin: Plugin = async (context) => {
 
   logger.info('dev team plugin initializing')
   const filesUpdated = await Promise.all([
-   // install(context, logger, 'skills'),
+    install(context, logger, 'skills'),
     install(context, logger, 'knowledge'),
     install(context, logger, 'references'),
     install(context, logger, 'scripts'),
@@ -23,7 +23,14 @@ const DevTeamPlugin: Plugin = async (context) => {
   state.updatesMade = filesUpdated.some(Boolean);
 
   return {
-    config: configHook(context, logger.child({ category: 'config' }), state),    
+    config: configHook(context, logger.child({ category: 'config' }), state),
+     "chat.params": async (input, output) => {
+      logger.info('chat.params received', { input, output });
+      output.options = {
+        ...output.options,
+        reasoningEffort: "high",
+      }
+    },    
     tool: {
       gherkin_export: gherkinExportTool(context.client),
       ...workflowTools(client, logger),

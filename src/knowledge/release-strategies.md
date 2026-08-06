@@ -59,7 +59,7 @@ during a transition. Every concurrent version multiplies the compatibility matri
 
 ## Planning hook
 
-When `/plan` decomposes a feature, prefer slices that keep trunk releasable at
+When `/planner` decomposes a feature, prefer slices that keep trunk releasable at
 every step: land the change behind a toggle or behind an abstraction, sequence
 data changes as expand-before-contract, and avoid a slice that is only shippable
 once the whole feature is done.

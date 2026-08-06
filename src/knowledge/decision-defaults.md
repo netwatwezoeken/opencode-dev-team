@@ -13,7 +13,7 @@ These are defaults, not laws — an explicit user instruction always wins. The p
 to resolve the axis *before* building, not to relitigate it mid-stream.
 
 **Non-interactive runs.** When no human can answer the upfront batch (headless
-`/plan`/`/build`, `--yes`, `DEV_TEAM_AUTO_APPROVE=1`), surfacing degrades to
+`/planner`/`/builder`, `--yes`, `DEV_TEAM_AUTO_APPROVE=1`), surfacing degrades to
 recording: take the recommended default for every ambiguous axis, state each axis and
 stance in the plan (and, via `/pr`, the PR body) — and **never take a non-default
 stance on any axis without an explicit user instruction**. A non-default stance with

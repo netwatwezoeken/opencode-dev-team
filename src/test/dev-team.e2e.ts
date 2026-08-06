@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { expectAgentAndModel } from './assertions';
-import { assertWireMockReachable, listCommands, resetWireMockScenarios, runTurn, startHarness } from './harness';
+import { assertWireMockReachable, listCommands, listAgents, resetWireMockScenarios, runTurn, startHarness } from './harness';
 
 describe('dev-team headless harness', () => {
   let harness: Awaited<ReturnType<typeof startHarness>>;
@@ -15,14 +15,14 @@ describe('dev-team headless harness', () => {
     harness?.dispose();
   });
 
-  test('the /specs command is registered', async () => {
+  test.each(['specs', 'planner'])('the /%s command is registered', async (name) => {
     const commands = await listCommands(harness.client);
-    expect(commands).toContain('specs');
+    expect(commands).toContain(name);
   });
 
-  test('the /plan command is registered', async () => {
-    const commands = await listCommands(harness.client);
-    expect(commands).toContain('plan');
+  test('the expected agents are registered', async () => {
+    const agents = await listAgents(harness.client);
+    expect(agents).toEqual(expect.arrayContaining(['specs', 'planner', 'builder', 'consult']));
   });
 
   test('/specs command results in specs agent with configured model', async () => {

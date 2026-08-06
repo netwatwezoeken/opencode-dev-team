@@ -15,12 +15,12 @@ export const PLAN_FILE_ONLY = 'plan-file-only';
 export function gherkinExportTool(client: PluginInput['client']) {
   return tool({
     description:
-      'Create a new opencode session through the TUI and run the /plan command in that new session.',
+      'Export gherkin bases on a plan file.',
     args: {
       plan_name: tool.schema.string(),
     },
 
-    async execute(args, context) {
+    async execute(args, context) {  
       const query = { directory: context.directory };
 
       const report = await exportPlanGherkin(path.join(args.plan_name), context.directory);

@@ -5,17 +5,17 @@ description: >-
   Code-First Small Batches cadence with a refactor on every green, runs
   inline review checkpoints, and produces verification evidence. Use when
   the user says "build this", "implement the plan", "start building", or
-  after /plan has been approved.
+  after /planner has been approved.
 mode: primary
 color: >-
-  #569cd6
+  #d8a0df
 ---
 
-# Build
+# Builder
 
 Role: orchestrator. This command implements an approved plan — it does not create plans or specs.
 
-You have been invoked with the `/build` command.
+You have been invoked with the `/builder` command.
 
 ## Orchestrator constraints
 
@@ -44,7 +44,7 @@ Invoke the [Context Loading Protocol](../context-loading-protocol/SKILL.md) at t
 
 ### 1. Find the plan
 
-If `--plan` was provided, read that file. Otherwise, search `plans/` for `.md` files and find the most recently modified one with `**Status**: approved`. If no approved plan is found, tell the user: "No approved plan found. Run `/plan` first, then approve it."
+If `--plan` was provided, read that file. Otherwise, search `plans/` for `.md` files and find the most recently modified one with `**Status**: approved`. If no approved plan is found, tell the user: "No approved plan found. Run `/planner` first, then approve it."
 
 ### 1.5. JS project bootstrap gate
 
@@ -53,7 +53,7 @@ Before any implementation step runs, make sure a JS-flavored plan has a project 
 1. **Check for `package.json`** in the working directory. If it exists, **skip this gate silently** and continue to Step 2.
 2. **Check the plan file for JS/TS signals** — any of `.js`, `.mjs`, `.ts`, `.jsx`, `.tsx`, `node`, `npm`, `vitest`, `jest`, `eslint`. If none are present, the plan is non-JS: **skip this gate silently** and continue to Step 2.
 3. **Bootstrap** (only when `package.json` is absent **and** the plan is JS-flavored): print exactly one line — `No package.json found for a JS plan — bootstrapping with project-init.` — then invoke the `project-init` skill.
-4. **Halt on failure.** If `project-init` fails, **stop `/build`** and report the failure — do not proceed to Step 2 or any implementation step.
+4. **Halt on failure.** If `project-init` fails, **stop `/builder`** and report the failure — do not proceed to Step 2 or any implementation step.
 
 The user sees no more than one line of output before `project-init` runs, and nothing at all when the gate is skipped.
 
@@ -102,7 +102,7 @@ flagged concern and `description` recording the user's decision to proceed anywa
 
 Work the plan **wave by wave** (the plan's `## Parallelization` section, derived by `scripts/plan_waves.py`). Within a wave, independent slices may build concurrently; across waves a barrier holds the next wave until the current one reconciles green.
 
-**Base-ref check (top-level session, before any subagent dispatch).** Worktree subagents (`isolation: "worktree"`) must branch from the caller's local HEAD, not `origin/<default>`, so the `docs/specs/<slug>.md` (when the spec was file-persisted — see `/specs`' GitHub-issue persistence path for the alternative, which leaves no local file to miss) and `plans/<slug>.md` files `/ship` just produced are visible to them (issue #553). This is controlled by Claude Code's `worktree.baseRef` setting, which is honored only at project (`.claude/settings.json`) or user (`~/.claude/settings.json`) scope — **not** at plugin or project-local scope (`docs/spikes/worktree-baseref-head-spike.md`). `/build` cannot set this on the user's behalf, so it runs a read-only detect-and-warn **in this top-level `/build` session, before any subagent dispatch**, so the warning is visible in the human-facing transcript:
+**Base-ref check (top-level session, before any subagent dispatch).** Worktree subagents (`isolation: "worktree"`) must branch from the caller's local HEAD, not `origin/<default>`, so the `docs/specs/<slug>.md` (when the spec was file-persisted — see `/specs`' GitHub-issue persistence path for the alternative, which leaves no local file to miss) and `plans/<slug>.md` files `/ship` just produced are visible to them (issue #553). This is controlled by Claude Code's `worktree.baseRef` setting, which is honored only at project (`.claude/settings.json`) or user (`~/.claude/settings.json`) scope — **not** at plugin or project-local scope (`docs/spikes/worktree-baseref-head-spike.md`). `/builder` cannot set this on the user's behalf, so it runs a read-only detect-and-warn **in this top-level `/builder` session, before any subagent dispatch**, so the warning is visible in the human-facing transcript:
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_worktree_baseref.py detect   # prints head|fresh|unset|unknown
@@ -128,7 +128,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_worktree_baseref.py detect   # print
 
   If detection returned `unknown`, the warning additionally states that `worktree.baseRef could not be detected`.
 
-**`/build` never mutates a settings file.** The check is read-only end to end — it never writes `.claude/settings.json`, `~/.claude/settings.json`, or any other settings file. There is nothing to restore and no crash-recovery surface.
+**`/builder` never mutates a settings file.** The check is read-only end to end — it never writes `.claude/settings.json`, `~/.claude/settings.json`, or any other settings file. There is nothing to restore and no crash-recovery surface.
 
 **Resolve the wave schedule and concurrency first:**
 
@@ -150,14 +150,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_jobs.py --wave-width <W> [--jobs N] 
 
 **Slice dispatch bookkeeping (issue #865).** Before a slice's first step begins:
 
-1. **Freeze scope (opt-in only).** Check whether the plan opts into scope enforcement: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py enabled <plan-file>` (exit 0 = engaged). Declaring slice-level `**Files:**` alone never freezes anything — only a `**Scope enforcement:** freeze` metadata line does (Ambiguity Log Q1). When engaged **and** the dispatching slice declares `**Files:**`, run `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py engage <plan-file> --slice <id> --hooks-dir <worktree>/hooks` — this writes `hooks/freeze-state.json` with `allowed_patterns` set to the slice's declared paths plus the fixed bookkeeping allowlist (the plan file, `memory/**`, `metrics/**`), so `hooks/pre_tool_guard.py` blocks any Write/Edit outside that scope without also blocking `/build`'s own progress writes. Clear it at slice completion (sub-step 5 below): `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py clear --hooks-dir <worktree>/hooks`.
+1. **Freeze scope (opt-in only).** Check whether the plan opts into scope enforcement: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py enabled <plan-file>` (exit 0 = engaged). Declaring slice-level `**Files:**` alone never freezes anything — only a `**Scope enforcement:** freeze` metadata line does (Ambiguity Log Q1). When engaged **and** the dispatching slice declares `**Files:**`, run `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py engage <plan-file> --slice <id> --hooks-dir <worktree>/hooks` — this writes `hooks/freeze-state.json` with `allowed_patterns` set to the slice's declared paths plus the fixed bookkeeping allowlist (the plan file, `memory/**`, `metrics/**`), so `hooks/pre_tool_guard.py` blocks any Write/Edit outside that scope without also blocking `/builder`'s own progress writes. Clear it at slice completion (sub-step 5 below): `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py clear --hooks-dir <worktree>/hooks`.
 2. **Rollback point.** When the slice declares `**Rollback point:**`, resolve the symbolic value to a concrete SHA and record it: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_rollback_point.py resolve --symbolic <value> --repo <worktree> --slice-start <HEAD-at-dispatch> --wave-start <wave-start-ref> --plan-start <plan-start-ref>`, then `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_rollback_point.py record --path memory/build-rollback.json --slice <id> --symbolic <value> --sha <resolved-sha>`. This is the boundary a dead-end escalation (issue #864) names verbatim: "revert to `<sha>` (`<symbolic>`)" — retrieve it with the script's `get` subcommand. A slice without `Rollback point` records nothing.
 
 For each step within a slice, dispatch implementation following the implementer template (`${CLAUDE_PLUGIN_ROOT}/prompts/implementer.md`). Pass the implementer its step **and the slice's Gherkin scenario(s)** — the scenarios are the behavioral contract the step's test must satisfy.
 
 Within the per-behavior mini-cycle below, repeated Write/Edit calls can race a `PostToolUse` hook that rewrites files (e.g., a formatter): an `Edit` failing on a stale `old_string` is expected to self-correct by re-`Read`ing the file before the next `Edit` attempt, not to escalate immediately.
 
-**Phase-state bookkeeping (guard input).** `/build` owns `memory/build-phase.json` as mechanical step bookkeeping: write `{"phase": "<implement|test|refactor>", "step": "<N.M>", "written_at": "<ISO8601>", "test_files_staged": []}` at **each** phase transition, and clear the file at step completion. At the **TEST → REFACTOR transition**, additionally stage the step's test files — `git add` them, including new/untracked ones — and record their paths in `test_files_staged`: the index becomes the refactor baseline the `refactor_test_freeze_guard` / `refactor_test_revert_guard` hooks enforce the tests-frozen invariant against.
+**Phase-state bookkeeping (guard input).** `/builder` owns `memory/build-phase.json` as mechanical step bookkeeping: write `{"phase": "<implement|test|refactor>", "step": "<N.M>", "written_at": "<ISO8601>", "test_files_staged": []}` at **each** phase transition, and clear the file at step completion. At the **TEST → REFACTOR transition**, additionally stage the step's test files — `git add` them, including new/untracked ones — and record their paths in `test_files_staged`: the index becomes the refactor baseline the `refactor_test_freeze_guard` / `refactor_test_revert_guard` hooks enforce the tests-frozen invariant against.
 
 Work each step **one behavior at a time** — never all the code then all the tests, never all the tests then all the code:
 
@@ -308,7 +308,7 @@ unresolved escalation.
 ## Integration
 
 - `/specs` produces the intent, architecture, and acceptance-criteria artifacts that inform the plan
-- `/plan` decomposes the feature into slices, authors each slice's Gherkin, and produces the plan this command executes
+- `/planner` decomposes the feature into slices, authors each slice's Gherkin, and produces the plan this command executes
 - `/verify` exercises each runtime-surface slice end-to-end before it may be marked done (sub-step 4.9, issue #727)
 - `/code-review` runs the full review suite after implementation
 - `farley-score` scores the branch's tests (Farley Score) as the final pre-PR quality signal
