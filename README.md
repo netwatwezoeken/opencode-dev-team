@@ -15,8 +15,8 @@ The plugin installs a three-phase workflow that keeps a human in the loop at eve
 | Phase | Agent | Purpose |
 |-------|-------|---------|
 | **Specs** | `specs` | Collaboratively produce three specification artifacts — Intent, Architecture, and Acceptance Criteria — and resolve ambiguity with a human *before* any implementation. Enforces a hard consistency gate. |
-| **Plan** | `planner` | Decompose the feature into vertical slices, author per-slice Gherkin scenarios, sequence the work into parallelizable waves, and run plan-review personas before human approval. |
-| **Build** | `build` | Execute the approved plan in small per-behavior batches (IMPLEMENT → TEST → REFACTOR), with inline review checkpoints, runtime verification, and test-quality scoring before opening a PR. |
+| **Planner** | `planner` | Decompose the feature into vertical slices, author per-slice Gherkin scenarios, sequence the work into parallelizable waves, and run plan-review personas before human approval. |
+| **Builder** | `builder` | Execute the approved plan in small per-behavior batches (IMPLEMENT → TEST → REFACTOR), with inline review checkpoints, runtime verification, and test-quality scoring before opening a PR. |
 
 Each phase hands off to the next only after explicit human approval, via the `workflow_advance` tool. The workflow can be started with the `/specs` command.
 
