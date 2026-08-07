@@ -16,10 +16,5 @@ rm -rf dist/references
 mkdir -p dist/references
 cp -R src/references/. dist/references/
 
-# Copy script files into dist/scripts so they ship under dist/ in the package
-rm -rf dist/scripts
-mkdir -p dist/scripts
-cp -R src/scripts/. dist/scripts/
-
 # If you need to exlude some packages from your bundle, you can use the --external flag. For example, to exclude the "lodash" package, you can run:
 # bun build ./src/index.ts --outdir dist --target bun --external lodash
