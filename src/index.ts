@@ -16,8 +16,7 @@ const DevTeamPlugin: Plugin = async (context) => {
   const filesUpdated = await Promise.all([
     install(context, logger, 'skills'),
     install(context, logger, 'knowledge'),
-    install(context, logger, 'references'),
-    install(context, logger, 'scripts'),
+    install(context, logger, 'references')
   ]);
   logger.info('dev team plugin plugin initialized')
   state.updatesMade = filesUpdated.some(Boolean);
