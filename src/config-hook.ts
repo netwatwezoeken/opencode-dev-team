@@ -12,7 +12,7 @@ export function configHook(
   state: { errors: PluginError[] }
 ) {
   return async (config: any) => {
-    const commandsDir = join(__dirname, "commands")
+    const commandsDir = join(import.meta.dir, "commands")
     const REQUIRED_COMMAND_FIELDS = ["description"] as const
 
     for (const file of readdirSync(commandsDir).filter(f => f.endsWith(".md"))) {
@@ -39,7 +39,7 @@ export function configHook(
       await addCommand(config, logger, commandName, command, state)
     }
 
-    const agentsDir = join(__dirname, "agents")
+    const agentsDir = join(import.meta.dir, "agents")
     const REQUIRED_AGENT_FIELDS = ["description", "mode", "color"] as const
 
     for (const file of readdirSync(agentsDir).filter(f => f.endsWith(".md"))) {
@@ -70,7 +70,7 @@ export function configHook(
       config.agent[agentName] = agent
     }
 
-    const subagentsDir = join(__dirname, "subagents")
+    const subagentsDir = join(import.meta.dir, "subagents")
     for (const file of readdirSync(subagentsDir).filter(f => f.endsWith(".md"))) {
       const agentName = file.replace(/\.md$/, "")
       const { data, content } = matter(readFileSync(join(subagentsDir, file), "utf-8"))
@@ -98,6 +98,8 @@ export function configHook(
 
       config.agent[agentName] = agent
     }
+
+    logger.info('dev team plugin plugin initialized')
   }
 
  async function addCommand(

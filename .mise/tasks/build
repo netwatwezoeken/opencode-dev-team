@@ -21,5 +21,20 @@ rm -rf dist/skills
 mkdir -p dist/skills
 cp -R src/skills/. dist/skills/
 
+# Copy agent files into dist/agents so they ship under dist/ in the package
+rm -rf dist/agents
+mkdir -p dist/agents
+cp -R src/agents/. dist/agents/
+
+# Copy subagent files into dist/subagents so they ship under dist/ in the package
+rm -rf dist/subagents
+mkdir -p dist/subagents
+cp -R src/subagents/. dist/subagents/
+
+# Copy command files into dist/commands so they ship under dist/ in the package
+rm -rf dist/commands
+mkdir -p dist/commands
+cp -R src/commands/. dist/commands/
+
 # If you need to exlude some packages from your bundle, you can use the --external flag. For example, to exclude the "lodash" package, you can run:
 # bun build ./src/index.ts --outdir dist --target bun --external lodash

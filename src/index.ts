@@ -18,7 +18,6 @@ const DevTeamPlugin: Plugin = async (context) => {
     install(context, logger, 'knowledge'),
     install(context, logger, 'references')
   ]);
-  logger.info('dev team plugin plugin initialized')
   state.updatesMade = filesUpdated.some(Boolean);
 
   return {
