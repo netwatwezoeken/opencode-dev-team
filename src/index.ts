@@ -4,7 +4,7 @@ import { configHook } from './config-hook';
 import { install } from './install';
 import { gherkinExportTool } from './plan-gherkin-export';
 import { workflowTools } from './workflow';
-import { TimeoutCoordinator } from './workflow-events';
+import { AppendPromptSwitcher, TuiEventCoordinator } from './tui';
 
 export type PluginError = { title: string; description: string }
 
@@ -21,6 +21,9 @@ const DevTeamPlugin: Plugin = async (context) => {
   ]);
   state.updatesMade = filesUpdated.some(Boolean);
 
+  const switcher = new AppendPromptSwitcher(client);
+  const coordinator = new TuiEventCoordinator(client, switcher);
+
   return {
     config: configHook(context, logger.child({ category: 'config' }), state),
      "chat.params": async (input, output) => {
@@ -32,7 +35,7 @@ const DevTeamPlugin: Plugin = async (context) => {
     },    
     tool: {
       gherkin_export: gherkinExportTool(context.client),
-      ...workflowTools(client, logger, new TimeoutCoordinator()),
+      ...workflowTools(client, logger, coordinator),
     },
     event: async ({ event }) => {
       if (event.type === "session.updated" ){

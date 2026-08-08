@@ -455,3 +455,32 @@ describe('handleTransitionCommand: switch throws an error (builder)', () => {
     expect(commands.every((c) => !c.includes(WORKFLOW_TRANSITION_ACKNOWLEDGED))).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Step 3.4 — Package export resolution
+// ---------------------------------------------------------------------------
+
+describe('tui module: default export satisfies TuiPluginModule shape', () => {
+  it('default export has a tui property', async () => {
+    const mod = await import('./tui.js');
+    expect(mod.default).toBeDefined();
+    expect(typeof (mod.default as { tui?: unknown }).tui).toBe('function');
+  });
+
+  it('default export does not have a server property', async () => {
+    const mod = await import('./tui.js');
+    expect((mod.default as { server?: unknown }).server).toBeUndefined();
+  });
+
+  it('WorkflowTuiPlugin is the tui export on the default module', async () => {
+    const mod = await import('./tui.js');
+    expect((mod.default as { tui?: unknown }).tui).toBe(mod.WorkflowTuiPlugin);
+  });
+});
+
+describe('server plugin index: still exports default plugin', () => {
+  it('index default export is a function (server Plugin)', async () => {
+    const mod = await import('./index.js');
+    expect(typeof mod.default).toBe('function');
+  });
+});

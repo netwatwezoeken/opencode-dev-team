@@ -261,3 +261,24 @@ export const WorkflowTuiPlugin: TuiPlugin = async (api) => {
 
   api.lifecycle.onDispose(unsubscribe);
 };
+
+// ---------------------------------------------------------------------------
+// TUI module export (opencode plugin entry point)
+// ---------------------------------------------------------------------------
+
+/**
+ * Default export satisfying the {@link TuiPluginModule} contract.
+ * Load this module as the TUI companion plugin in your opencode config:
+ *
+ * ```json
+ * { "plugin": ["opencode-dev-team/tui"] }
+ * ```
+ *
+ * You must also load the server plugin (`"opencode-dev-team"`) separately.
+ * Restart opencode after adding or changing plugin configuration.
+ */
+const WorkflowTuiPluginModule = {
+  tui: WorkflowTuiPlugin,
+} as const;
+
+export default WorkflowTuiPluginModule;
