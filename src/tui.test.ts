@@ -367,3 +367,91 @@ describe('handleTransitionCommand: unrelated events are ignored', () => {
     expect(deps.toast).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Step 3.3 — TUI transition failure surface
+// ---------------------------------------------------------------------------
+
+describe('handleTransitionCommand: missing switch capability (unavailable API)', () => {
+  const unavailableDeps = () =>
+    makeDeps({ appendAgentMention: vi.fn().mockRejectedValue(new Error('switch API unavailable')) });
+
+  it('shows [ERROR] Workflow transition to planner failed', async () => {
+    const deps = unavailableDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.toast).toHaveBeenCalledWith(
+      expect.stringContaining('[ERROR] Workflow transition to planner failed'),
+      'error',
+    );
+  });
+
+  it('includes recovery instruction in error notification', async () => {
+    const deps = unavailableDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.toast).toHaveBeenCalledWith(
+      expect.stringContaining('Check that the TUI companion plugin is loaded and restart opencode'),
+      'error',
+    );
+  });
+
+  it('emits workflow.transition.failed with targetAgent', async () => {
+    const deps = unavailableDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining(WORKFLOW_TRANSITION_FAILED),
+    );
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining('planner'),
+    );
+  });
+
+  it('does not emit a successful acknowledgement', async () => {
+    const deps = unavailableDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    const commands = (deps.emitCommand as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[0] as string,
+    );
+    expect(commands.every((c) => !c.includes(WORKFLOW_TRANSITION_ACKNOWLEDGED))).toBe(true);
+  });
+});
+
+describe('handleTransitionCommand: switch throws an error (builder)', () => {
+  const throwingDeps = () =>
+    makeDeps({ appendAgentMention: vi.fn().mockRejectedValue(new Error('unexpected crash')) });
+
+  it('shows [ERROR] Workflow transition to builder failed', async () => {
+    const deps = throwingDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(BUILDER_PAYLOAD), deps, state);
+    expect(deps.toast).toHaveBeenCalledWith(
+      expect.stringContaining('[ERROR] Workflow transition to builder failed'),
+      'error',
+    );
+  });
+
+  it('emits workflow.transition.failed for builder', async () => {
+    const deps = throwingDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(BUILDER_PAYLOAD), deps, state);
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining(WORKFLOW_TRANSITION_FAILED),
+    );
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining('builder'),
+    );
+  });
+
+  it('does not emit a successful acknowledgement for builder failure', async () => {
+    const deps = throwingDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(BUILDER_PAYLOAD), deps, state);
+    const commands = (deps.emitCommand as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[0] as string,
+    );
+    expect(commands.every((c) => !c.includes(WORKFLOW_TRANSITION_ACKNOWLEDGED))).toBe(true);
+  });
+});
