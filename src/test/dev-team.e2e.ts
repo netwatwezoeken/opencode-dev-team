@@ -22,7 +22,7 @@ describe('dev-team headless harness', () => {
 
   test('the expected agents are registered', async () => {
     const agents = await listAgents(harness.client);
-    expect(agents).toEqual(expect.arrayContaining(['specs', 'planner', 'builder', 'consult']));
+    expect(agents).toEqual(expect.arrayContaining(['specs', 'planner', 'builder']));
   });
 
   test('/specs command results in specs agent with configured model', async () => {

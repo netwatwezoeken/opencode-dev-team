@@ -2,7 +2,7 @@
 
 **Created**: 2026-08-08T11:45:31Z
 **Branch**: main
-**Status**: approved
+**Status**: in-progress
 **Gherkin persistence**: plan-file-only
 
 ## Goal
@@ -402,12 +402,12 @@ This section is the machine-parseable recovery handle. `/builder` updates checkb
 
 ### Slices
 
-- [ ] Slice 1: Shared Workflow Transition Contract
-  - [ ] Step 1.1: Define transition, acknowledgement, and validation contract
-- [ ] Slice 2: Server Emits Transitions Instead of Prompting Handoff
-  - [ ] Step 2.1: Emit and await workflow transitions from `workflow_advance`
-  - [ ] Step 2.2: Remove server prompt handoff fallback
-  - [ ] Step 2.3: Cover server failure and no-transition branches
+- [x] Slice 1: Shared Workflow Transition Contract
+  - [x] Step 1.1: Define transition, acknowledgement, and validation contract
+- [x] Slice 2: Server Emits Transitions Instead of Prompting Handoff
+  - [x] Step 2.1: Emit and await workflow transitions from `workflow_advance`
+  - [x] Step 2.2: Remove server prompt handoff fallback
+  - [x] Step 2.3: Cover server failure and no-transition branches
 - [ ] Slice 3: Companion TUI Plugin Switches the Primary Agent
   - [ ] Step 3.1: Pin the TUI primary-agent adapter contract
   - [ ] Step 3.2: Subscribe to transitions and switch primary agents

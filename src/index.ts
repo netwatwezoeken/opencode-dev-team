@@ -4,6 +4,7 @@ import { configHook } from './config-hook';
 import { install } from './install';
 import { gherkinExportTool } from './plan-gherkin-export';
 import { workflowTools } from './workflow';
+import { TimeoutCoordinator } from './workflow-events';
 
 export type PluginError = { title: string; description: string }
 
@@ -31,7 +32,7 @@ const DevTeamPlugin: Plugin = async (context) => {
     },    
     tool: {
       gherkin_export: gherkinExportTool(context.client),
-      ...workflowTools(client, logger),
+      ...workflowTools(client, logger, new TimeoutCoordinator()),
     },
     event: async ({ event }) => {
       if (event.type === "session.updated" ){

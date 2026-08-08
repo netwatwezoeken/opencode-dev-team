@@ -119,3 +119,18 @@ export function isTransitionFailedPayload(
     typeof v['message'] === 'string'
   );
 }
+
+// ---------------------------------------------------------------------------
+// Default coordinator (no TUI companion present)
+// ---------------------------------------------------------------------------
+
+/**
+ * A coordinator that immediately returns `timeout`, representing the case
+ * where no TUI companion is loaded. Used as the default in the server plugin.
+ * Replace with a real event-bus coordinator when the TUI companion is active.
+ */
+export class TimeoutCoordinator implements WorkflowTransitionCoordinator {
+  async publish(payload: WorkflowTransitionRequestedPayload): Promise<TransitionOutcome> {
+    return { status: 'timeout', targetAgent: payload.targetAgent };
+  }
+}
