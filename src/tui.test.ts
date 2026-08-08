@@ -3,10 +3,15 @@ import {
   AppendPromptSwitcher,
   TuiEventCoordinator,
   WorkflowTuiPlugin,
+  handleTransitionCommand,
   type TUIPrimaryAgentSwitcher,
+  type TuiCompanionDeps,
+  type TuiCompanionState,
 } from './tui.js';
 import {
   WORKFLOW_TRANSITION_REQUESTED,
+  WORKFLOW_TRANSITION_ACKNOWLEDGED,
+  WORKFLOW_TRANSITION_FAILED,
   type WorkflowTransitionRequestedPayload,
 } from './workflow-events.js';
 
@@ -40,6 +45,31 @@ function makeWorkingSwitcher(): TUIPrimaryAgentSwitcher {
   return {
     appendAgentMention: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+function makeDeps(overrides: Partial<Record<keyof TuiCompanionDeps, unknown>> = {}): {
+  toast: ReturnType<typeof vi.fn>;
+  emitCommand: ReturnType<typeof vi.fn>;
+  appendAgentMention: ReturnType<typeof vi.fn>;
+} {
+  return {
+    toast: vi.fn(),
+    emitCommand: vi.fn(),
+    appendAgentMention: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  } as {
+    toast: ReturnType<typeof vi.fn>;
+    emitCommand: ReturnType<typeof vi.fn>;
+    appendAgentMention: ReturnType<typeof vi.fn>;
+  };
+}
+
+function makeState(currentAgent?: string): TuiCompanionState {
+  return { currentAgent };
+}
+
+function makeTransitionCommand(payload: WorkflowTransitionRequestedPayload): string {
+  return `${WORKFLOW_TRANSITION_REQUESTED}:${JSON.stringify(payload)}`;
 }
 
 const PLANNER_PAYLOAD: WorkflowTransitionRequestedPayload = {
@@ -205,11 +235,135 @@ describe('TuiEventCoordinator: switcher throws → failed', () => {
 });
 
 // ---------------------------------------------------------------------------
-// WorkflowTuiPlugin: TUI companion event subscription (Step 3.1 static check)
+// WorkflowTuiPlugin: is a valid TuiPlugin function
 // ---------------------------------------------------------------------------
 
 describe('WorkflowTuiPlugin: is a valid TuiPlugin function', () => {
   it('is a function', () => {
     expect(typeof WorkflowTuiPlugin).toBe('function');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Step 3.2 — handleTransitionCommand: core companion handler
+// ---------------------------------------------------------------------------
+
+describe('handleTransitionCommand: planner target switches and acknowledges', () => {
+  it('calls appendAgentMention with planner', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.appendAgentMention).toHaveBeenCalledWith('planner');
+  });
+
+  it('shows [OK] toast with nextStep and targetAgent', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.toast).toHaveBeenCalledWith(
+      expect.stringContaining('[OK] Workflow step: planner | Agent: planner'),
+      'info',
+    );
+  });
+
+  it('emits workflow.transition.acknowledged for planner', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED),
+    );
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining('planner'),
+    );
+  });
+
+  it('does not emit failure', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    const commands = (deps.emitCommand as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[0] as string,
+    );
+    expect(commands.every((c) => !c.includes(WORKFLOW_TRANSITION_FAILED))).toBe(true);
+  });
+});
+
+describe('handleTransitionCommand: builder target switches and acknowledges', () => {
+  it('calls appendAgentMention with builder', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(BUILDER_PAYLOAD), deps, state);
+    expect(deps.appendAgentMention).toHaveBeenCalledWith('builder');
+  });
+
+  it('shows [OK] toast with builder step', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(BUILDER_PAYLOAD), deps, state);
+    expect(deps.toast).toHaveBeenCalledWith(
+      expect.stringContaining('[OK] Workflow step: builder | Agent: builder'),
+      'info',
+    );
+  });
+
+  it('emits workflow.transition.acknowledged for builder', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand(makeTransitionCommand(BUILDER_PAYLOAD), deps, state);
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED),
+    );
+  });
+});
+
+describe('handleTransitionCommand: idempotency — already on target agent', () => {
+  it('does not call appendAgentMention again', async () => {
+    const deps = makeDeps();
+    const state = makeState('planner'); // already on planner
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.appendAgentMention).not.toHaveBeenCalled();
+  });
+
+  it('does not show an error notification', async () => {
+    const deps = makeDeps();
+    const state = makeState('planner');
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    const errorCalls = (deps.toast as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c: unknown[]) => c[1] === 'error',
+    );
+    expect(errorCalls).toHaveLength(0);
+  });
+
+  it('acknowledges the already-handled transition', async () => {
+    const deps = makeDeps();
+    const state = makeState('planner');
+    await handleTransitionCommand(makeTransitionCommand(PLANNER_PAYLOAD), deps, state);
+    expect(deps.emitCommand).toHaveBeenCalledWith(
+      expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED),
+    );
+  });
+});
+
+describe('handleTransitionCommand: unrelated events are ignored', () => {
+  it('does not call appendAgentMention for session.updated', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand('session.updated:{}', deps, state);
+    expect(deps.appendAgentMention).not.toHaveBeenCalled();
+  });
+
+  it('does not emit any workflow event for unrelated command', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand('session.updated:{}', deps, state);
+    expect(deps.emitCommand).not.toHaveBeenCalled();
+  });
+
+  it('does not show a toast for unrelated command', async () => {
+    const deps = makeDeps();
+    const state = makeState();
+    await handleTransitionCommand('session.list', deps, state);
+    expect(deps.toast).not.toHaveBeenCalled();
   });
 });
