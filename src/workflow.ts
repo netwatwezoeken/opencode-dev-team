@@ -118,6 +118,12 @@ export function workflowTools(
       },
     }),
 
+    /**
+     * Starts the workflow at the given step by prompting that step's agent
+     * via `session.promptAsync`. Unlike `workflow_advance`, this tool calls
+     * `promptAsync` directly because it is the entry point — there is no
+     * prior step or TUI companion to coordinate with.
+     */
     workflow_start: tool({
       description: 'Start the workflow.',
       args: {

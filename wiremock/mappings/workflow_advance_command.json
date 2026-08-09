@@ -1,0 +1,47 @@
+{
+  "mappings": [
+    {
+      "name": "workflow_advance_specs_approved_first",
+      "scenarioName": "workflow-advance-specs",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "AdvanceRequested",
+      "request": {
+        "url": "/v1/chat/completions",
+        "method": "POST",
+        "bodyPatterns": [
+          { "contains": "advance-specs-integration-trigger" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "workflow_advance-specs-approved.json",
+        "headers": {
+          "Content-Type": "text/event-stream; charset=utf-8"
+        }
+      },
+      "persistent": true,
+      "insertionIndex": 3
+    },
+    {
+      "name": "workflow_advance_specs_approved_after",
+      "scenarioName": "workflow-advance-specs",
+      "requiredScenarioState": "AdvanceRequested",
+      "request": {
+        "url": "/v1/chat/completions",
+        "method": "POST",
+        "bodyPatterns": [
+          { "contains": "advance-specs-integration-trigger" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "done.json",
+        "headers": {
+          "Content-Type": "text/event-stream; charset=utf-8"
+        }
+      },
+      "persistent": true,
+      "insertionIndex": 3
+    }
+  ]
+}

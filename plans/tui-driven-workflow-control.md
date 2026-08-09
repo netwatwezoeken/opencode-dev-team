@@ -2,7 +2,7 @@
 
 **Created**: 2026-08-08T11:45:31Z
 **Branch**: main
-**Status**: in-progress
+**Status**: implemented
 **Gherkin persistence**: plan-file-only
 
 ## Goal
@@ -408,11 +408,11 @@ This section is the machine-parseable recovery handle. `/builder` updates checkb
   - [x] Step 2.1: Emit and await workflow transitions from `workflow_advance`
   - [x] Step 2.2: Remove server prompt handoff fallback
   - [x] Step 2.3: Cover server failure and no-transition branches
-- [ ] Slice 3: Companion TUI Plugin Switches the Primary Agent
-  - [ ] Step 3.1: Pin the TUI primary-agent adapter contract
-  - [ ] Step 3.2: Subscribe to transitions and switch primary agents
-  - [ ] Step 3.3: Surface TUI transition failures
-  - [ ] Step 3.4: Package and document the companion plugin
-- [ ] Slice 4: Preserve Workflow Entry Point and End-to-End Signals
-  - [ ] Step 4.1: Extend integration coverage for start and transition signals
-  - [ ] Step 4.2: Documentation alignment
+- [x] Slice 3: Companion TUI Plugin Switches the Primary Agent
+  - [x] Step 3.1: Pin the TUI primary-agent adapter contract
+  - [x] Step 3.2: Subscribe to transitions and switch primary agents
+  - [x] Step 3.3: Surface TUI transition failures
+  - [x] Step 3.4: Package and document the companion plugin
+- [x] Slice 4: Preserve Workflow Entry Point and End-to-End Signals
+  - [x] Step 4.1: Extend integration coverage for start and transition signals
+  - [x] Step 4.2: Documentation alignment

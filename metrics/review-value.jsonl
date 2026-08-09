@@ -1,0 +1,1 @@
+{"timestamp":"2026-08-08T12:30:00Z","plan":"plans/tui-driven-workflow-control.md","slice":"3","step":"all","checkpoint":"slice","complexity":"standard","source":"build-checkpoint","agents_run":["spec-compliance-review"],"issues_found":0,"severity_breakdown":{"errors":0,"warnings":0,"suggestions":0},"issues_fixed":0,"fix_iterations":0,"outcome":"no-op"}
