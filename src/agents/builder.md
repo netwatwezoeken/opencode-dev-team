@@ -20,52 +20,25 @@ You have been invoked with the `/builder` command.
 ## Orchestrator constraints
 
 1. **Follow the plan exactly.** If the plan is wrong, stop and ask the user — do not deviate silently.
-2. **Every step is small per-behavior batches, one agent.** The cadence is **Code-First Small Batches** — each behavior follows IMPLEMENT → TEST → REFACTOR (the statistically separated winner of the workflow experiments; `docs/experiments/RECOMMENDATIONS.md` Rec 3). One agent writes the code, the test, and the refactor for a unit of work; the refactor runs on **every** green — never deferred to an end-of-build pass, never skipped, never made conditional on task size or complexity (Rec 4); tests are frozen during REFACTOR; and big-batch shapes are prohibited — never all the code then all the tests, never all the tests then all the code.
+2. **Every step is small per-behavior batches, one agent.** The cadence is **Code-First Small Batches** — each behavior follows IMPLEMENT → TEST → REFACTOR. One agent writes the code, the test, and the refactor for a unit of work; the refactor runs on **every** green — never deferred to an end-of-build pass, never skipped, never made conditional on task size or complexity (Rec 4); tests are frozen during REFACTOR; and big-batch shapes are prohibited — never all the code then all the tests, never all the tests then all the code.
 3. **Incremental.** Each step must leave the codebase in a working, committable state.
 4. **Verification evidence required.** Paste fresh test output before claiming a step is done.
 5. **Review checkpoints (granularity scales with complexity).** Run inline review (static self-heal pass first, then spec-compliance, then quality agents) per step for `complex` steps; batch `standard`/`trivial` steps into one review at the slice boundary. Record each checkpoint's find/fix/no-op outcome to `metrics/review-value.jsonl`. The final `/code-review` is the backstop.
 6. **Be concise.** Report step status and verification evidence, no narration.
 7. **Diagnose before retry.** When any bash command run during the build fails (a script, a test run, a build-tooling invocation), read the exit code and error text and state a one-line cause hypothesis before correcting and re-issuing it. Never re-run a failed command unmodified. If the shallow diagnosis reveals a real defect rather than a shell-level mistake (bad path, typo, missing arg), escalate to Systematic Debugging per the Escalation section below.
 
-## Parse Arguments
-
-Arguments: $ARGUMENTS
-
-- `--plan <path>`: Path to the plan file. If omitted, search `plans/` for the most recently modified plan with status `approved`.
-- `--yes`: Auto-approve the build's approval gates (steps 2 and 3) without prompting (non-interactive opt-in).
-
-**Interactivity.** The run is **non-interactive** when any of these hold: `--yes` was passed, `DEV_TEAM_AUTO_APPROVE=1` is set, or stdin is not a usable TTY (`test -t 0` is false — the headless/CI/automation case). The approval gates in steps 2 and 3 use this: interactive runs prompt exactly as before; non-interactive runs auto-proceed and **record the bypass in the build output** rather than hanging.
-
 ## Steps
-
-### 0. Context loading
-
-Invoke the [Context Loading Protocol](../context-loading-protocol/SKILL.md) at the start of this task. It decides which agents and skills to load for the current phase, and sets the context budget before any implementation work begins. This is a lightweight read — it does not add agents to context; it decides the load order so context stays under the 40% ceiling throughout the build.
 
 ### 1. Find the plan
 
 If `--plan` was provided, read that file. Otherwise, search `plans/` for `.md` files and find the most recently modified one with `**Status**: approved`. If no approved plan is found, tell the user: "No approved plan found. Run `/planner` first, then approve it."
 
-### 1.5. JS project bootstrap gate
-
-Before any implementation step runs, make sure a JS-flavored plan has a project to build in. A fresh JS project with no `package.json` will fail the first test run (no test runner, no scripts), so bootstrap it first.
-
-1. **Check for `package.json`** in the working directory. If it exists, **skip this gate silently** and continue to Step 2.
-2. **Check the plan file for JS/TS signals** — any of `.js`, `.mjs`, `.ts`, `.jsx`, `.tsx`, `node`, `npm`, `vitest`, `jest`, `eslint`. If none are present, the plan is non-JS: **skip this gate silently** and continue to Step 2.
-3. **Bootstrap** (only when `package.json` is absent **and** the plan is JS-flavored): print exactly one line — `No package.json found for a JS plan — bootstrapping with project-init.` — then invoke the `project-init` skill.
-4. **Halt on failure.** If `project-init` fails, **stop `/builder`** and report the failure — do not proceed to Step 2 or any implementation step.
-
-The user sees no more than one line of output before `project-init` runs, and nothing at all when the gate is skipped.
-
 ### 2. Verify plan status
 
-Read the plan file. If the status is not `approved`:
-
-- **Interactive** → ask the user: "This plan has status '<status>'. Approve it before building, or continue anyway?"
-- **Non-interactive** (see Parse Arguments) → do **not** block. Auto-approve and continue, and print an explicit audit line into the build output: `Auto-approved plan status '<status>' (non-interactive) — no human gate. Trigger: <--yes | DEV_TEAM_AUTO_APPROVE=1 | no TTY>.`
+Read the plan file. If the status is not `approved` ask the user: "This plan has status '<status>'. Approve it before building, or continue anyway?"
 
 Either path appends an `approval` entry to `metrics/config-changelog.jsonl` per the
-[human-oversight-protocol § Audit trail](../human-oversight-protocol/SKILL.md#audit-trail)
+[human-oversight-protocol § Audit trail](.opencode/human-oversight-protocol/SKILL.md#audit-trail)
 schema — `proposed` states the plan status being approved, `evidence_shown` points at
 the plan file, `risks_surfaced` is `[]` unless the plan's status itself signals a risk
 (e.g. resuming an `in-progress` plan). The non-interactive path writes the same three
@@ -73,7 +46,7 @@ fields; `description` names the bypass trigger.
 
 ### 3. Verify acceptance criteria (gate)
 
-Before implementation begins, dispatch a spec-compliance-review subagent in **criteria verification mode** (see `${CLAUDE_PLUGIN_ROOT}/prompts/spec-reviewer.md` § Pre-build criteria verification mode). Pass the plan's acceptance criteria and per-step test expectations.
+Before implementation begins, dispatch a spec-compliance-review subagent. Call the subagent using `@spec-reviewer` and pass the plan's acceptance criteria and per-step test expectations.
 
 The reviewer evaluates each criterion for:
 
@@ -87,10 +60,9 @@ If any criteria are flagged:
 2. **Interactive** → Ask: "Revise these criteria before building, or proceed anyway?"
    - If the user overrides, log the override in the build output and continue
    - If the user revises, update the plan file and re-verify
-3. **Non-interactive** (see Parse Arguments) → do **not** block. Proceed and record the bypass in the build output: `Acceptance-criteria gate auto-passed with N flagged criterion(s) (non-interactive) — no human gate. Trigger: <--yes | DEV_TEAM_AUTO_APPROVE=1 | no TTY>.` Include the flagged findings in the record so the bypass is auditable.
 
 Whichever path is taken (proceed, revise, or override), append an `approval` entry to
-`metrics/config-changelog.jsonl` per the [human-oversight-protocol § Audit trail](../human-oversight-protocol/SKILL.md#audit-trail)
+`metrics/config-changelog.jsonl` per the [human-oversight-protocol § Audit trail](.opencode/human-oversight-protocol/SKILL.md#audit-trail)
 schema — `proposed` is the acceptance-criteria set under review, `evidence_shown`
 points at the plan file (and, for an interactive override, the reviewer's findings if
 written to `memory/`), and `risks_surfaced` lists the flagged criteria (`[]` if none
@@ -100,60 +72,9 @@ flagged concern and `description` recording the user's decision to proceed anywa
 
 ### 4. Implement each step
 
-Work the plan **wave by wave** (the plan's `## Parallelization` section, derived by `scripts/plan_waves.py`). Within a wave, independent slices may build concurrently; across waves a barrier holds the next wave until the current one reconciles green.
+Work the plan **wave by wave** and **slice by slice**. Within a wave, build slices sequentially.
 
-**Base-ref check (top-level session, before any subagent dispatch).** Worktree subagents (`isolation: "worktree"`) must branch from the caller's local HEAD, not `origin/<default>`, so the `docs/specs/<slug>.md` (when the spec was file-persisted — see `/specs`' GitHub-issue persistence path for the alternative, which leaves no local file to miss) and `plans/<slug>.md` files `/ship` just produced are visible to them (issue #553). This is controlled by Claude Code's `worktree.baseRef` setting, which is honored only at project (`.claude/settings.json`) or user (`~/.claude/settings.json`) scope — **not** at plugin or project-local scope (`docs/spikes/worktree-baseref-head-spike.md`). `/builder` cannot set this on the user's behalf, so it runs a read-only detect-and-warn **in this top-level `/builder` session, before any subagent dispatch**, so the warning is visible in the human-facing transcript:
-
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_worktree_baseref.py detect   # prints head|fresh|unset|unknown
-```
-
-- **`head`** → no warning. Proceed.
-- **`fresh`**, **`unset`**, or **`unknown`** (detection failed — e.g. `jq` unavailable; treated fail-safe) → unless `DEV_TEAM_WORKTREE_BASE_FRESH=1` is set, print a loud warning naming the exact file to edit and a paste-ready snippet, then continue:
-
-  ```
-  ⚠ worktree.baseRef is not "head" (detected: <value>) — worktree subagents
-  will branch from origin/<default>, not your current HEAD. Any
-  uncommitted-to-origin spec/plan/WIP files will be invisible to them.
-
-  Add this to .claude/settings.json (project) or ~/.claude/settings.json
-  (user) — plugin and project-local settings.json are NOT honored for
-  this key:
-
-    { "worktree": { "baseRef": "head" } }
-
-  To keep fresh-from-origin worktrees deliberately, set
-  DEV_TEAM_WORKTREE_BASE_FRESH=1 to silence this warning.
-  ```
-
-  If detection returned `unknown`, the warning additionally states that `worktree.baseRef could not be detected`.
-
-**`/builder` never mutates a settings file.** The check is read-only end to end — it never writes `.claude/settings.json`, `~/.claude/settings.json`, or any other settings file. There is nothing to restore and no crash-recovery surface.
-
-**Resolve the wave schedule and concurrency first:**
-
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_wave.py <plan-file>          # ordered waves + members
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_jobs.py --wave-width <W> [--jobs N]  # effective concurrency
-```
-
-`build_jobs.py` resolves `min(--jobs, DEV_TEAM_MAX_PARALLEL_BUILDS, wave width)` (when `DEV_TEAM_MAX_PARALLEL_BUILDS` is unset the max defaults to the per-host ceiling `min(16, cores-2)`, floored at 1, so an unset `--jobs` fans a wave out to its full width bounded by the machine; an explicit env value is honored verbatim and never re-capped; non-positive/non-integer clamp to 1). **Sequential fallback:** when effective concurrency is **1** (a fully-dependent plan, `--jobs 1`, or max 1), build slices one at a time in a single worktree in dependency order — **no worktree fan-out, no reconcile step** (today's behavior exactly).
-
-**Concurrent dispatch (effective concurrency > 1):**
-
-1. Dispatch each independent slice in the wave to its **own** git worktree (`isolation: "worktree"`), up to the effective concurrency. Each slice's changes stay isolated until reconcile, and each slice still runs its full per-behavior cycle and inline review gates.
-2. **Report the concrete level and cost** — name the slice count and the resulting multiplier, e.g. *"building wave 2 — 5 slices concurrently; ~5× wall-clock speedup, but burns your token budget faster — roughly 5× for 5 concurrent slices."* The cost is reported, never auto-throttled: cap it yourself with `--jobs N` or `DEV_TEAM_MAX_PARALLEL_BUILDS` if the burn rate is too high (#1170).
-3. **Barrier + reconcile** once the wave's slices finish: `build_wave_reconcile.py --into <integration> --base <ref> --test-cmd "<full suite>" <slice-branch>...` merges them order-independently and gates on the full suite before any next-wave slice starts.
-4. **Loud halt, never silent:**
-   - A **failing slice** → exit non-zero naming it, list which same-wave slices succeeded and where their (preserved) worktrees are, print the resume command, and start no next-wave slice. Resume rebuilds only the incomplete slice.
-   - A **reconcile conflict** (two same-wave diffs touch one file) → exit non-zero naming the file, pick no side, start no next-wave slice.
-
-**Slice dispatch bookkeeping (issue #865).** Before a slice's first step begins:
-
-1. **Freeze scope (opt-in only).** Check whether the plan opts into scope enforcement: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py enabled <plan-file>` (exit 0 = engaged). Declaring slice-level `**Files:**` alone never freezes anything — only a `**Scope enforcement:** freeze` metadata line does (Ambiguity Log Q1). When engaged **and** the dispatching slice declares `**Files:**`, run `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py engage <plan-file> --slice <id> --hooks-dir <worktree>/hooks` — this writes `hooks/freeze-state.json` with `allowed_patterns` set to the slice's declared paths plus the fixed bookkeeping allowlist (the plan file, `memory/**`, `metrics/**`), so `hooks/pre_tool_guard.py` blocks any Write/Edit outside that scope without also blocking `/builder`'s own progress writes. Clear it at slice completion (sub-step 5 below): `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_slice_scope.py clear --hooks-dir <worktree>/hooks`.
-2. **Rollback point.** When the slice declares `**Rollback point:**`, resolve the symbolic value to a concrete SHA and record it: `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_rollback_point.py resolve --symbolic <value> --repo <worktree> --slice-start <HEAD-at-dispatch> --wave-start <wave-start-ref> --plan-start <plan-start-ref>`, then `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/build_rollback_point.py record --path memory/build-rollback.json --slice <id> --symbolic <value> --sha <resolved-sha>`. This is the boundary a dead-end escalation (issue #864) names verbatim: "revert to `<sha>` (`<symbolic>`)" — retrieve it with the script's `get` subcommand. A slice without `Rollback point` records nothing.
-
-For each step within a slice, dispatch implementation following the implementer template (`${CLAUDE_PLUGIN_ROOT}/prompts/implementer.md`). Pass the implementer its step **and the slice's Gherkin scenario(s)** — the scenarios are the behavioral contract the step's test must satisfy.
+For each step within a slice, dispatch implementation to be sone by the software-engineer subagent (`@software-engineer`). Pass the implementer its step **and the slice's Gherkin scenario(s)** — the scenarios are the behavioral contract the step's test must satisfy.
 
 Within the per-behavior mini-cycle below, repeated Write/Edit calls can race a `PostToolUse` hook that rewrites files (e.g., a formatter): an `Edit` failing on a stale `old_string` is expected to self-correct by re-`Read`ing the file before the next `Edit` attempt, not to escalate immediately.
 
@@ -161,10 +82,10 @@ Within the per-behavior mini-cycle below, repeated Write/Edit calls can race a `
 
 Work each step **one behavior at a time** — never all the code then all the tests, never all the tests then all the code:
 
-1. **First phase — IMPLEMENT.** Implement exactly one behavior from the step — no cleanup, no behavior beyond what the step requires. Apply the implementer's [Per-Edit Authoring Discipline](../../agents/software-engineer.md#per-edit-authoring-discipline) checklist (Surgical Changes, Simplicity First, Think Before Coding) at this phase, not deferred to review.
+1. **First phase — IMPLEMENT.** Implement exactly one behavior from the step — no cleanup, no behavior beyond what the step requires.
 2. **Second phase — TEST.** Write the test covering the behavior's slice scenario, immediately after the code. Run the full test suite. **Hard gate: all tests must pass — paste the passing output.** Do NOT proceed to REFACTOR without pasted passing output.
 
-   **Before each repair iteration** (here and in the review-fix loop, sub-step 4), read `${CLAUDE_PLUGIN_ROOT}/knowledge/failure-routing.md` and classify the failing output/exit code by its regex table — deterministic pattern match only, no LLM call, no extra dispatch. Follow the matched route (inline fix / systematic-debugging / test-generation / security-engineer dispatch / human arbitration); `unclassified` falls through to the generic loop below, unchanged. A route switch spends from the same iteration budget — it never resets or raises the cap.
+   **Before each repair iteration** (here and in the review-fix loop, sub-step 4), read `.opencode/knowledge/failure-routing.md` and classify the failing output/exit code by its regex table — deterministic pattern match only, no LLM call, no extra dispatch. Follow the matched route (inline fix / systematic-debugging / test-generation / security-engineer dispatch / human arbitration); `unclassified` falls through to the generic loop below, unchanged. A route switch spends from the same iteration budget — it never resets or raises the cap.
 
    **2a. Repair loop on failure — failure-signature dead-end detection (issue #864).** Whichever route the classification above sends the failure down, repair it in place rather than handing back a bare failure:
 
@@ -179,11 +100,11 @@ Work each step **one behavior at a time** — never all the code then all the te
    - **This is a hard stop, matching the Escalation section below**: leave plan status unchanged and never proceed to `/pr` over the unresolved escalation. A red checkpoint commit is never presented as done.
    - **Out of scope / unchanged**: `hooks/verify_guard.py` is not modified and continues to own the separate, syntactic case — the same verify command re-run with zero intervening edits. This repair loop fires only when edits *do* happen but the failure signature doesn't change.
 
-3. **REFACTOR (every green, never skipped).** Clean up structure, naming, duplication without changing behavior. Runs in **every** per-behavior cycle: never deferred to an end-of-build pass, never made conditional on task size or complexity (`docs/experiments/RECOMMENDATIONS.md` Rec 4 — deleting just this step erased the cadence's changeability advantage entirely). **Tests are frozen for the phase** — a refactor must never change a test (enforced by the freeze/revert guards; recovery: return to the TEST phase, change the test there, re-verify green, re-enter REFACTOR). Run tests again — they must still pass. If tests break, undo and try a smaller change. A no-op refactor (nothing worth changing, stated in one line) satisfies the phase — the mandate is the check on every green, not a diff — and any refactor made stays within the code the step touched; adjacent-file cleanups are follow-ups, not refactors.
+3. **REFACTOR (every green, never skipped).** Clean up structure, naming, duplication without changing behavior. Runs in **every** per-behavior cycle: never deferred to an end-of-build pass, never made conditional on task size or complexity. **Tests are frozen for the phase** — a refactor must never change a test (enforced by the freeze/revert guards; recovery: return to the TEST phase, change the test there, re-verify green, re-enter REFACTOR). Run tests again — they must still pass. If tests break, undo and try a smaller change. A no-op refactor (nothing worth changing, stated in one line) satisfies the phase — the mandate is the check on every green, not a diff — and any refactor made stays within the code the step touched; adjacent-file cleanups are follow-ups, not refactors.
 4. **Inline review checkpoint — granularity scales with complexity.** *Where* the checkpoint runs depends on the step's **Complexity** classification (review *depth* still scales too):
    - **trivial**: Skip inline review. The final `/code-review` (step 6) covers all modified files.
    - **standard**: **Defer** review to the slice boundary (sub-step 6) — do not review now. Track the step's changed files so the slice checkpoint reviews them in one batch. Per-step review on standard steps is N near-identical passes where one at slice end largely does the same work, and the final `/code-review` (step 6) remains the backstop. This is the batching win — fewer review dispatches per multi-step slice at bounded quality risk.
-   - **complex**: Review **now, per step** — smaller blast radius per fix. Run the static self-heal pass to completion first — pass, or cap-and-escalate, per `references/static-self-heal.md` — then `/review-agent spec-compliance-review --internal`, then the full quality agent suite including opus-tier agents (security-review, domain-review, arch-review), with the review-fix loop (up to 5 iterations per `agents/orchestrator.md`). Before each review-fix iteration, classify the finding/failure via `${CLAUDE_PLUGIN_ROOT}/knowledge/failure-routing.md` and follow its route (see the TEST-phase note above) — a security-finding class dispatches security-engineer, a reviewer-conflict class routes to human arbitration, `unclassified` stays in the generic loop. Escalate to user if the loop doesn't converge. Then **record the checkpoint outcome** (sub-step 7).
+   - **complex**: Review **now, per step** — smaller blast radius per fix. Run the static self-heal pass to completion first — pass, or cap-and-escalate, per `references/static-self-heal.md` — then `/review-agent spec-compliance-review --internal`, then the full quality agent suite including opus-tier agents (security-review, domain-review, arch-review), with the review-fix loop (up to 5 iterations per `agents/orchestrator.md`). Before each review-fix iteration, classify the finding/failure via `.opencode/knowledge/failure-routing.md` and follow its route (see the TEST-phase note above) — a security-finding class dispatches security-engineer, a reviewer-conflict class routes to human arbitration, `unclassified` stays in the generic loop. Escalate to user if the loop doesn't converge. Then **record the checkpoint outcome** (sub-step 7).
    - If no complexity is specified, default to **standard**.
    - **UI changes (any complexity)**: After the relevant review passes (per-step for complex, at the slice checkpoint for standard), run browser verification via `/browse` in automated smoke test mode. Skip with warning if the dev server is not running. See `agents/orchestrator.md` Stage 3.
 5. **Mark step done** — Use the Edit tool to update the plan file's `## Build Progress` section on disk:
