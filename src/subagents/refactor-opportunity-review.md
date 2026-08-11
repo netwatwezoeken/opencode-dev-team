@@ -4,7 +4,8 @@ description: Assesses refactoring opportunities after tests pass (TDD REFACTOR p
 mode: subagent
 model: github-copilot/claude-haiku-4.5
 effort: high
-color: green
+color: >-
+  #4dba85
 ---
 
 # Refactor Opportunity Review

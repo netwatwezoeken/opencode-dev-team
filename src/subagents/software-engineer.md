@@ -2,9 +2,11 @@
 name: software-engineer
 description: Full-stack development, code generation, implementation, and refactoring
 tools: Read, Grep, Glob, Edit, Write, Bash, Skill, mcp__codegraph__*, mcp__plugin_repowise_repowise__get_context, mcp__plugin_repowise_repowise__get_symbol, mcp__plugin_repowise_repowise__search_codebase, mcp__plugin_repowise_repowise__get_risk
+mode: subagent
 model: github-copilot/claude-sonnet-4.6
 effort: high
-color: yellow
+color: >-
+  #4dba85
 skills:
   - quality-gate-pipeline
   - test-driven-development
