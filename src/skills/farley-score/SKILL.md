@@ -13,12 +13,9 @@ Evaluates test quality using the 8 properties of good tests as described by Andr
 
 Attribution: Andrea Laforgia / Dave Farley — properties of good automated tests.
 
-**Locating the tests to score.** Prefer CodeGraph/Repowise over raw
+**Locating the tests to score.** Prefer serena raw
 `Grep`/`Glob` for finding the test files in scope and the production code
-they exercise — grounding "Maintainable" and "Necessary" scores in real
-coupling and call-graph data instead of guessing from test names alone. See
-[`knowledge/codegraph-vs-graphify.md`](.opencode/knowledge/codegraph-vs-graphify.md)
-for tool selection and the fallback contract.
+they exercise.
 
 ## The 8 Properties
 

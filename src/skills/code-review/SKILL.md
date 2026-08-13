@@ -158,8 +158,6 @@ If `REVIEW-CONTEXT.md` exists at the repo root, read it and pass its contents to
 | Documentation MCP | wiki/docs search available | Architecture docs |
 | Semgrep | `which semgrep` | SAST context for security-review |
 
-Pass availability info to each agent so they can use enhanced tools or fall back to Glob/Grep/Read. All read-only review agents grant these MCP tools; see [`knowledge/codegraph-vs-graphify.md`](../../knowledge/codegraph-vs-graphify.md) for tool selection and the fallback contract. Include availability in the final report per `knowledge/review-template.md`.
-
 ### 2. Pre-flight gates
 
 Skip entirely if `--background`. If `--force` without `--reason`, halt:
@@ -409,7 +407,7 @@ Prints `{"maxParallel": N, "waves": [[...], [...]]}` — `maxParallel` defaults 
 - **Static analysis context**: if step 2b produced findings, inject into every agent's prompt using the format in `skills/static-analysis-integration/SKILL.md`: "These issues were detected by static analysis. Do not re-report them. Focus on semantic concerns."
 - **Per-agent output**: the shared contract in [`knowledge/review-agent-output-contract.md`](../../knowledge/review-agent-output-contract.md), wrapped with `agentName`/`modelTier` (full aggregation shape in `output-format.md`).
 
-**Graph-assisted review**: pass tool availability to **all read-only review agents** — the structural lenses (`arch-review`, `component-architecture-review`, `structure-review`, `domain-review`) benefit most from resolved call graphs, but every lens gains cheaper verified reads — so they may consult the index for impact/dependency context before flagging findings. Tool selection and the fallback contract are the same as step 1c above; see [`knowledge/codegraph-vs-graphify.md`](../../knowledge/codegraph-vs-graphify.md).
+**Graph-assisted review**: pass tool availability to **all read-only review agents** — the structural lenses (`arch-review`, `component-architecture-review`, `structure-review`, `domain-review`) benefit most from resolved call graphs, but every lens gains cheaper verified reads
 
 **Dispatch failure handling — retry once, never drop silently (issue #1752).** After **each wave** returns, check every agent dispatched **in that wave** (not the full eligible roster — a later wave hasn't dispatched yet) for a valid per-agent result matching [`review-agent-output-contract.md`](../../knowledge/review-agent-output-contract.md). Compute this dispatched-vs-returned coverage check deterministically instead of eyeballing the two lists:
 

@@ -53,10 +53,8 @@ src/
 ### 1. Identify Boundaries
 - Enumerate all external dependencies (databases, APIs, message brokers, file systems)
 - Identify each as an inbound or outbound interaction
-- **Graph-assisted discovery.** Prefer CodeGraph/Repowise over raw `Grep` for
-  locating adapters, port implementations, and cross-layer imports — see
-  [`knowledge/codegraph-vs-graphify.md`](../../knowledge/codegraph-vs-graphify.md)
-  for tool selection and the fallback contract.
+- **Graph-assisted discovery.** Prefer serena over raw `Grep` for
+  locating adapters, port implementations, and cross-layer imports.
 
 ### 2. Define Ports
 - Create an inbound port interface for each use case the application exposes

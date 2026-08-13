@@ -1,4 +1,3 @@
-- codegraph-vs-graphify.md --> how about Serena?
 - **Performance Metrics**: `hallucination_detected`, `rework_cycles`, `defects_found` are logged automatically by `hooks/task_completion_metrics.py` --> .claude/session-metrics.json
 - Concurrency?
 - .claude/memory/

@@ -40,7 +40,7 @@ If the suite is tiny (few test files), shows no shape pathology, and follows cle
 
 Inventory tests by layer (unit / integration / component / contract / E2E). Derive the actual **shape** and compare it to the shape the architecture *should* produce, using the *Other shapes* + *Shape ↔ architecture fit* tables in `test-pyramid.md`. Report the mismatch (e.g. tall pyramid over thin-glue code, or ice-cream cone), not the silhouette alone.
 
-**Graph-assisted inventory.** Prefer CodeGraph/Repowise over raw `Grep` for mapping test files to the architecture layers they exercise — see [`knowledge/codegraph-vs-graphify.md`](../../knowledge/codegraph-vs-graphify.md) for tool selection and the fallback contract.
+**Graph-assisted inventory.** Prefer serena over raw `Grep` for mapping test files to the architecture layers they exercise.
 
 ### 3. Quadrant coverage
 

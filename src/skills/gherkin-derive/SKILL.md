@@ -86,10 +86,8 @@ existing tests for error/edge branches that are **not** present in the
 documented spec, and add those as *supplemental* characterization scenarios
 rather than dropping them.
 
-**Graph-assisted discovery.** Prefer CodeGraph/Repowise over raw `Grep` for
-locating routes, handlers, and exported signatures — see
-[`knowledge/codegraph-vs-graphify.md`](../../knowledge/codegraph-vs-graphify.md)
-for tool selection and the fallback contract.
+**Graph-assisted discovery.** Prefer serena over raw `Grep` for
+locating routes, handlers, and exported signatures.
 
 **Async / event / scheduled surfaces — a separate discovery pass, run
 regardless of the cascade above.** These have no OpenAPI equivalent and the

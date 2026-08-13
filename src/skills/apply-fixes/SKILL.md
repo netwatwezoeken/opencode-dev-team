@@ -96,11 +96,9 @@ Copy this checklist and track progress:
 For each prompt, sorted by priority (high first), then by
 confidence (high before medium):
 
-**Check blast radius before editing.** Prefer CodeGraph/Repowise over raw
+**Check blast radius before editing.** Prefer serena over raw
 `Grep` on the affected symbol/file before applying the fix, to see what else
-depends on it. See
-[`knowledge/codegraph-vs-graphify.md`](../../knowledge/codegraph-vs-graphify.md)
-for tool selection and the fallback contract.
+depends on it.
 
 **`confidence: high` — auto-apply:**
 
