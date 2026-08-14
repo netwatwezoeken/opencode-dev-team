@@ -24,6 +24,16 @@ Create a separate test project with an `opencode.json` file:
 }
 ```
 
+Create `tui.json` beside it and load the package directory. OpenCode resolves
+the package's dedicated `./tui` export automatically:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["file://<test-project>/.opencode/node_modules/opencode-dev-team"]
+}
+```
+
 In that test project's `.opencode` directory, create a `package.json` file that installs the generated package:
 
 ```json
@@ -40,9 +50,13 @@ The test project should have this structure:
 ```text
 <test-project>/
 |-- opencode.json
+|-- tui.json
 `-- .opencode/
     `-- package.json
 ```
+
+Fully quit and restart opencode after changing either config or rebuilding the
+package.
 
 ## Testing
 

@@ -14,7 +14,10 @@ Each phase advances only after its quality and approval gates pass.
 
 ## Installation
 
-Add the package to your opencode configuration:
+OpenCode server plugins and TUI plugins use separate configuration files. Add
+the package to both files using the **same package version**.
+
+`opencode.json`:
 
 ```json
 {
@@ -22,6 +25,20 @@ Add the package to your opencode configuration:
   "plugin": ["opencode-dev-team"]
 }
 ```
+
+`tui.json` (next to `opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["opencode-dev-team"]
+}
+```
+
+Then fully quit and restart opencode. Configuration and plugins are loaded only
+at startup. Loading `opencode-dev-team` only in `opencode.json` enables the
+workflow tools but cannot switch the active TUI agent, so transitions report
+that the companion TUI plugin is not loaded.
 
 opencode installs the package automatically. On first use, the plugin installs its bundled agents, commands, knowledge, references, and skills into the project's `.opencode/` directory.
 
@@ -36,6 +53,15 @@ You can specify a specific version, this includes pre-releases:
 }
 ```
 
+Use the matching package spec in `tui.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["opencode-dev-team@0.0.1-alpha011"]
+}
+```
+
 ## Usage
 
 Start a workflow in opencode:
@@ -45,6 +71,14 @@ Start a workflow in opencode:
 ```
 
 The specs agent creates a specification under `docs/specs/`. After approval, the planner produces an implementation plan under `plans/`, and the builder implements it slice by slice.
+
+### TUI agent cycling
+
+The server plugin requests a named workflow transition and waits for the TUI
+companion to acknowledge it. The companion dispatches `agent.cycle` inside the
+TUI until the active prompt agent reaches the requested workflow agent. The
+plugin constrains the visible cycle to `specs`, `planner`, and `builder` and
+uses `specs` as the default agent.
 
 ## Status
 
