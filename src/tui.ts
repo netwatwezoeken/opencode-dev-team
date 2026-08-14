@@ -1,283 +1,248 @@
 import type { PluginInput } from '@opencode-ai/plugin';
 import type { TuiPlugin } from '@opencode-ai/plugin/tui';
 import {
-  WORKFLOW_TRANSITION_REQUESTED,
+  DEFAULT_TRANSITION_TIMEOUT_MS,
+  WORKFLOW_AGENTS,
   WORKFLOW_TRANSITION_ACKNOWLEDGED,
   WORKFLOW_TRANSITION_FAILED,
-  type WorkflowTransitionCoordinator,
-  type WorkflowTransitionRequestedPayload,
-  type TransitionOutcome,
+  WORKFLOW_TRANSITION_REQUESTED,
+  isTransitionAcknowledgedPayload,
+  isTransitionFailedPayload,
   isTransitionRequestedPayload,
+  type TransitionOutcome,
+  type WorkflowSelectionInput,
+  type WorkflowTransitionAcknowledgedPayload,
+  type WorkflowTransitionCoordinator,
+  type WorkflowTransitionFailedPayload,
+  type WorkflowTransitionRequestedPayload,
 } from './workflow-events.js';
 
-// ---------------------------------------------------------------------------
-// TUI primary-agent switcher adapter
-// ---------------------------------------------------------------------------
+type PendingTransition = {
+  resolve(outcome: TransitionOutcome): void;
+  timer: ReturnType<typeof setTimeout>;
+};
 
-/**
- * Adapter contract for switching the TUI primary agent.
- *
- * The concrete implementation calls `client.tui.appendPrompt` (v1 SDK) to
- * prepend `@<agent> ` to the TUI prompt, which is the user-facing mechanism
- * for selecting a primary agent in opencode.
- *
- * NOTE: `session.switchAgent` from the opencode v2 SDK is intentionally NOT
- * used — it is a v2-only API not available in v1. All primary-agent switching
- * goes through `appendPrompt` to remain compatible with opencode v1.
- */
-export interface TUIPrimaryAgentSwitcher {
-  /**
-   * Switch the TUI primary agent to the given agent name by prepending
-   * `@<agent> ` to the TUI prompt.
-   *
-   * @throws if the underlying TUI API call fails or the API is unavailable.
-   */
-  appendAgentMention(agent: string): Promise<void>;
-}
+export class TuiEventCoordinator implements WorkflowTransitionCoordinator {
+  private readonly pending = new Map<string, PendingTransition>();
 
-// ---------------------------------------------------------------------------
-// Concrete adapter (production, server-side)
-// ---------------------------------------------------------------------------
+  constructor(
+    private readonly client: PluginInput['client'],
+    private readonly requestId: () => string = () => crypto.randomUUID(),
+    private readonly timeoutMs = DEFAULT_TRANSITION_TIMEOUT_MS,
+  ) {}
 
-/**
- * Concrete adapter that delegates to `client.tui.appendPrompt` from the
- * opencode v1 SDK. The `agent` string is prepended as `@<agent> ` so the TUI
- * registers it as a primary-agent mention.
- *
- * Focus is preserved because `appendPrompt` does not steal focus from the
- * active input field.
- */
-export class AppendPromptSwitcher implements TUIPrimaryAgentSwitcher {
-  constructor(private readonly client: PluginInput['client']) {}
-
-  async appendAgentMention(agent: string): Promise<void> {
-    const result = await this.client.tui.appendPrompt({
-      body: { text: `@${agent} ` },
+  async select(input: WorkflowSelectionInput, directory: string): Promise<TransitionOutcome> {
+    const requestId = this.requestId();
+    const payload: WorkflowTransitionRequestedPayload = { ...input, requestId };
+    const outcome = new Promise<TransitionOutcome>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(requestId);
+        resolve({ status: 'timeout', targetAgent: input.targetAgent });
+      }, this.timeoutMs);
+      this.pending.set(requestId, { resolve, timer });
     });
-    if (result.error) {
-      throw new Error(
-        `appendPrompt failed: ${JSON.stringify(result.error)}`,
-      );
+
+    try {
+      const result = await this.client.tui.publish({
+        query: { directory },
+        body: {
+          type: 'tui.command.execute',
+          properties: {
+            command: `${WORKFLOW_TRANSITION_REQUESTED}:${JSON.stringify(payload)}`,
+          },
+        },
+      });
+
+      if (result.error || result.data !== true) {
+        this.resolve(requestId, {
+          status: 'failed',
+          targetAgent: input.targetAgent,
+          message: result.error
+            ? `selection request failed: ${JSON.stringify(result.error)}`
+            : 'selection request was not handled by the TUI',
+        });
+      }
+    } catch (error) {
+      this.resolve(requestId, {
+        status: 'failed',
+        targetAgent: input.targetAgent,
+        message: `selection request failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
     }
+
+    return outcome;
+  }
+
+  handleCommand(command: string): void {
+    const acknowledged = parseCommandPayload(command, WORKFLOW_TRANSITION_ACKNOWLEDGED);
+    if (isTransitionAcknowledgedPayload(acknowledged)) {
+      this.resolve(acknowledged.requestId, {
+        status: 'acknowledged',
+        targetAgent: acknowledged.targetAgent,
+      });
+      return;
+    }
+
+    const failed = parseCommandPayload(command, WORKFLOW_TRANSITION_FAILED);
+    if (isTransitionFailedPayload(failed)) {
+      this.resolve(failed.requestId, {
+        status: 'failed',
+        targetAgent: failed.targetAgent,
+        message: failed.message,
+      });
+    }
+  }
+
+  private resolve(requestId: string, outcome: TransitionOutcome): void {
+    const pending = this.pending.get(requestId);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.pending.delete(requestId);
+    pending.resolve(outcome);
   }
 }
 
-// ---------------------------------------------------------------------------
-// TUI event coordinator (server-side WorkflowTransitionCoordinator impl)
-// ---------------------------------------------------------------------------
+function parseCommandPayload(command: string, eventName: string): unknown {
+  const prefix = `${eventName}:`;
+  if (!command.startsWith(prefix)) return undefined;
+  try {
+    return JSON.parse(command.slice(prefix.length));
+  } catch {
+    return undefined;
+  }
+}
 
-/**
- * Implements {@link WorkflowTransitionCoordinator} using the opencode v1 SDK.
- *
- * On `publish`:
- * 1. Publishes a `tui.command.execute` event encoding the transition payload as
- *    JSON in the command string (`workflow.transition.requested:<json>`) so the
- *    TUI companion can subscribe and show the `[OK]` notification.
- * 2. Calls `appendAgentMention` via the switcher to switch the primary agent.
- * 3. Returns `{ status: 'acknowledged' }` if both succeed.
- *    Returns `{ status: 'failed' }` if the agent switch throws.
- *    Returns `{ status: 'timeout' }` if the tui.publish call throws (e.g. no
- *    active TUI companion / TUI not running).
- */
-export class TuiEventCoordinator implements WorkflowTransitionCoordinator {
-  constructor(
-    private readonly client: PluginInput['client'],
-    private readonly switcher: TUIPrimaryAgentSwitcher,
-  ) {}
+export interface TuiCompanionDeps {
+  listAgents(): Promise<Array<{ name: string; mode: string; hidden?: boolean }>>;
+  dispatchAgentCycle(): { ok: true } | { ok: false; reason: string };
+  publishCommand(command: string): Promise<void>;
+  toast(message: string, variant: 'info' | 'error'): void;
+}
 
-  async publish(payload: WorkflowTransitionRequestedPayload): Promise<TransitionOutcome> {
-    const { targetAgent } = payload;
-    const command = `${WORKFLOW_TRANSITION_REQUESTED}:${JSON.stringify(payload)}`;
+function visibleAgentRing(
+  agents: Array<{ name: string; mode: string; hidden?: boolean }>,
+): string[] {
+  return agents
+    .filter((agent) => agent.mode !== 'subagent' && agent.hidden !== true)
+    .map((agent) => agent.name);
+}
 
-    // Notify the TUI companion so it can show the confirmation toast.
-    // `tui.publish` with tui.command.execute reaches all listening TUI plugins.
-    try {
-      await this.client.tui.publish({
+export async function handleTransitionCommand(
+  command: string,
+  deps: TuiCompanionDeps,
+): Promise<void> {
+  const payload = parseCommandPayload(command, WORKFLOW_TRANSITION_REQUESTED);
+  if (payload === undefined) return;
+
+  if (!isTransitionRequestedPayload(payload)) {
+    deps.toast('[ERROR] Workflow selection request was invalid.', 'error');
+    return;
+  }
+
+  let ring: string[];
+  try {
+    ring = visibleAgentRing(await deps.listAgents());
+  } catch (error) {
+    await publishFailure(
+      payload,
+      `could not read the TUI agent ring: ${error instanceof Error ? error.message : String(error)}`,
+      deps,
+    );
+    return;
+  }
+  const workflowOnly =
+    ring.length === WORKFLOW_AGENTS.length &&
+    WORKFLOW_AGENTS.every((agent) => ring.includes(agent));
+  const sourceIndex = ring.indexOf(payload.sourceAgent);
+  const targetIndex = ring.indexOf(payload.targetAgent);
+  if (!workflowOnly || sourceIndex === -1 || targetIndex === -1) {
+    await publishFailure(
+      payload,
+      `workflow agent ring mismatch; expected only ${WORKFLOW_AGENTS.join(', ')}, got ${ring.join(', ')}`,
+      deps,
+    );
+    return;
+  }
+
+  const distance = (targetIndex - sourceIndex + ring.length) % ring.length;
+  for (let index = 0; index < distance; index += 1) {
+    const result = deps.dispatchAgentCycle();
+    if (!result.ok) {
+      await publishFailure(payload, `agent.cycle failed: ${result.reason}`, deps);
+      return;
+    }
+  }
+
+  const acknowledged: WorkflowTransitionAcknowledgedPayload = {
+    requestId: payload.requestId,
+    targetAgent: payload.targetAgent,
+  };
+  await deps.publishCommand(
+    `${WORKFLOW_TRANSITION_ACKNOWLEDGED}:${JSON.stringify(acknowledged)}`,
+  );
+  deps.toast(
+    `[OK] Workflow step: ${payload.nextStep} | Agent: ${payload.targetAgent}`,
+    'info',
+  );
+}
+
+async function publishFailure(
+  payload: WorkflowTransitionRequestedPayload,
+  message: string,
+  deps: TuiCompanionDeps,
+): Promise<void> {
+  const failed: WorkflowTransitionFailedPayload = {
+    requestId: payload.requestId,
+    targetAgent: payload.targetAgent,
+    message,
+  };
+  await deps.publishCommand(`${WORKFLOW_TRANSITION_FAILED}:${JSON.stringify(failed)}`);
+  deps.toast(`[ERROR] Workflow transition failed: ${message}`, 'error');
+}
+
+export const WorkflowTuiPlugin: TuiPlugin = async (api) => {
+  const deps: TuiCompanionDeps = {
+    async listAgents() {
+      const result = await api.client.app.agents();
+      if (result.error || !result.data) {
+        throw new Error(`could not list TUI agents: ${JSON.stringify(result.error)}`);
+      }
+      return result.data;
+    },
+    dispatchAgentCycle() {
+      const result = api.keymap.dispatchCommand('agent.cycle');
+      return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+    },
+    async publishCommand(command) {
+      const result = await api.client.tui.publish({
         body: {
           type: 'tui.command.execute',
           properties: { command },
         },
       });
-    } catch {
-      // TUI not available or no companion listening — surface as timeout.
-      return { status: 'timeout', targetAgent };
-    }
-
-    // Switch the primary agent via appendPrompt.
-    try {
-      await this.switcher.appendAgentMention(targetAgent);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { status: 'failed', targetAgent, message };
-    }
-
-    return { status: 'acknowledged', targetAgent };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// TUI companion plugin — injectable deps for testability
-// ---------------------------------------------------------------------------
-
-/**
- * Dependencies injected into the TUI companion's transition handler.
- * Extracted so unit tests can drive the handler without a live TuiPluginApi.
- */
-export interface TuiCompanionDeps {
-  /** Show a notification toast. Focus is never stolen. */
-  toast(message: string, variant: 'info' | 'error'): void;
-  /**
-   * Emit a transition acknowledgement or failure signal.
-   * In production this publishes a tui.command.execute command string.
-   * In tests, spies on this to assert emitted event names and payloads.
-   */
-  emitCommand(command: string): void;
-  /**
-   * Switch the TUI primary agent by appending `@<agent> ` to the prompt.
-   * @throws if the underlying API is unavailable or the call fails.
-   */
-  appendAgentMention(agent: string): Promise<void>;
-}
-
-/** Tracks the last successfully switched agent for idempotency. */
-export interface TuiCompanionState {
-  currentAgent: string | undefined;
-}
-
-/**
- * Core handler for `tui.command.execute` events carrying a
- * `workflow.transition.requested:` payload.
- *
- * Extracted for unit-testability. Handles:
- * - Filtering unrelated commands (no-op)
- * - Parsing / validating the JSON payload
- * - Idempotency when already on the target agent
- * - Switching the primary agent and showing `[OK]` / `[ERROR]` toasts
- * - Emitting `workflow.transition.acknowledged` or `workflow.transition.failed`
- */
-export async function handleTransitionCommand(
-  command: string,
-  deps: TuiCompanionDeps,
-  state: TuiCompanionState,
-): Promise<void> {
-  const prefix = `${WORKFLOW_TRANSITION_REQUESTED}:`;
-  if (!command.startsWith(prefix)) {
-    return; // unrelated — ignore, emit nothing
-  }
-
-  const raw = command.slice(prefix.length);
-  let payload: unknown;
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    deps.toast(
-      `[ERROR] Workflow transition failed: could not parse transition payload. Check that the TUI companion plugin is loaded and restart opencode, then run workflow_status to confirm the current step.`,
-      'error',
-    );
-    return;
-  }
-
-  if (!isTransitionRequestedPayload(payload)) {
-    deps.toast(
-      `[ERROR] Workflow transition failed: invalid transition payload. Check that the TUI companion plugin is loaded and restart opencode, then run workflow_status to confirm the current step.`,
-      'error',
-    );
-    return;
-  }
-
-  const { nextStep, targetAgent } = payload;
-
-  // Idempotency: already on this agent — acknowledge without switching again.
-  if (state.currentAgent === targetAgent) {
-    deps.emitCommand(
-      `${WORKFLOW_TRANSITION_ACKNOWLEDGED}:${JSON.stringify({ targetAgent })}`,
-    );
-    return;
-  }
-
-  // Switch the primary agent.
-  try {
-    await deps.appendAgentMention(targetAgent);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    deps.toast(
-      `[ERROR] Workflow transition to ${targetAgent} failed: ${message}. Check that the TUI companion plugin is loaded and restart opencode, then run workflow_status to confirm the current step.`,
-      'error',
-    );
-    deps.emitCommand(
-      `${WORKFLOW_TRANSITION_FAILED}:${JSON.stringify({ targetAgent, message })}`,
-    );
-    return;
-  }
-
-  state.currentAgent = targetAgent;
-  deps.toast(`[OK] Workflow step: ${nextStep} | Agent: ${targetAgent}`, 'info');
-  deps.emitCommand(
-    `${WORKFLOW_TRANSITION_ACKNOWLEDGED}:${JSON.stringify({ targetAgent })}`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// TUI companion plugin (production wiring)
-// ---------------------------------------------------------------------------
-
-/**
- * The opencode TUI companion plugin for workflow step transitions.
- *
- * Subscribes to `tui.command.execute` events carrying a
- * `workflow.transition.requested:` payload, switches the TUI primary agent via
- * `appendPrompt` (preserving input focus), emits acknowledgement/failure
- * command strings for TUI observability, and shows color-independent
- * `[OK]`/`[ERROR]` toast notifications.
- */
-export const WorkflowTuiPlugin: TuiPlugin = async (api) => {
-  const state: TuiCompanionState = { currentAgent: undefined };
-
-  const deps: TuiCompanionDeps = {
+      if (result.error || result.data !== true) {
+        throw new Error(`could not publish workflow acknowledgement: ${JSON.stringify(result.error)}`);
+      }
+    },
     toast(message, variant) {
       api.ui.toast({ variant, message });
-    },
-    emitCommand(_command) {
-      // The acknowledgement/failure is observable via the coordinator's
-      // appendPrompt outcome (server side). This hook exists for TUI-layer
-      // observability and is a best-effort no-op in production because the
-      // opencode v1 tui.publish API does not support arbitrary round-trip
-      // events. Tests inject a spy here to assert emitted command strings.
-    },
-    async appendAgentMention(agent) {
-      const result = await api.client.tui.appendPrompt({ text: `@${agent} ` });
-      if ((result as { error?: unknown }).error) {
-        throw new Error(
-          `appendPrompt failed: ${JSON.stringify((result as { error?: unknown }).error)}`,
-        );
-      }
     },
   };
 
   const unsubscribe = api.event.on('tui.command.execute', (event) => {
     const command = (event.properties as { command?: string }).command ?? '';
-    void handleTransitionCommand(command, deps, state);
+    void handleTransitionCommand(command, deps).catch((error) => {
+      api.ui.toast({
+        variant: 'error',
+        message: `[ERROR] Workflow transition failed: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    });
   });
-
   api.lifecycle.onDispose(unsubscribe);
 };
 
-// ---------------------------------------------------------------------------
-// TUI module export (opencode plugin entry point)
-// ---------------------------------------------------------------------------
-
-/**
- * Default export satisfying the {@link TuiPluginModule} contract.
- * Load this module as the TUI companion plugin in your opencode config:
- *
- * ```json
- * { "plugin": ["opencode-dev-team/tui"] }
- * ```
- *
- * You must also load the server plugin (`"opencode-dev-team"`) separately.
- * Restart opencode after adding or changing plugin configuration.
- */
 const WorkflowTuiPluginModule = {
+  id: 'opencode-dev-team-tui',
   tui: WorkflowTuiPlugin,
 } as const;
 
