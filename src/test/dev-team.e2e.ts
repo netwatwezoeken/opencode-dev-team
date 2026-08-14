@@ -47,10 +47,8 @@ describe('dev-team headless harness', () => {
 // harness. WireMock stubs use body-pattern matching on a unique trigger string
 // embedded in the user message so they only fire for the intended session.
 //
-// In the headless harness, `client.tui.publish` and `client.tui.appendPrompt`
-// return 200 (no TUI process needed for the server endpoint), so
-// `TuiEventCoordinator.publish` returns `{ status: "acknowledged" }`.
-// The integration tests therefore assert the acknowledged success path.
+// The headless harness has no TUI companion. A successful HTTP publish is not
+// an agent-selection acknowledgement, so transitions must time out clearly.
 //
 // Negative cases (no TUI companion → [ERROR], promptAsync absence) are fully
 // covered by the unit tests in workflow.test.ts (Steps 2.2–2.3).
@@ -69,11 +67,9 @@ describe('workflow transition signals (integration)', () => {
     harness?.dispose();
   });
 
-  test('approved specs advance: tool result confirms acknowledged transition to planner', async () => {
+  test('approved specs advance without a TUI companion reports timeout', async () => {
     // WireMock stub "workflow-advance-specs" body-matches on "advance-specs-integration-trigger"
     // and returns an LLM response that calls workflow_advance(approve:true, current:"specs").
-    // In headless mode, tui.publish + appendPrompt both return 200, so the coordinator
-    // returns { status: "acknowledged" } and the tool result confirms the TUI handoff.
     const session = await harness.client.session.create({ body: { title: 'advance specs integration' } });
     expect(session.data?.id).toBeTruthy();
 
@@ -86,10 +82,10 @@ describe('workflow transition signals (integration)', () => {
     const calls = toolCalls(messages, harness.events.all());
     const advanceCall = calls.find((c) => c.name === 'workflow_advance');
     expect(advanceCall, 'workflow_advance tool call not found in messages').toBeDefined();
-    // In headless harness: coordinator returns acknowledged → tool reports handoff confirmed
-    expect(advanceCall!.output).toContain('acknowledged');
+    expect(advanceCall!.output).toContain('[ERROR]');
+    expect(advanceCall!.output).toContain('no TUI companion acknowledged');
     expect(advanceCall!.output).toContain('planner');
-  }, 30_000);
+  }, 40_000);
 
   test('approved builder final step: tool result reports workflow complete', async () => {
     // WireMock stub "workflow-advance-builder" body-matches on "advance-builder-integration-trigger"
@@ -111,4 +107,3 @@ describe('workflow transition signals (integration)', () => {
     expect(advanceCall!.output).toContain('specs → planner → builder');
   }, 30_000);
 });
-

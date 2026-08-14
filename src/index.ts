@@ -4,7 +4,7 @@ import { configHook } from './config-hook';
 import { install } from './install';
 import { gherkinExportTool } from './plan-gherkin-export';
 import { workflowTools } from './workflow';
-import { AppendPromptSwitcher, TuiEventCoordinator } from './tui';
+import { TuiEventCoordinator } from './tui';
 
 export type PluginError = { title: string; description: string }
 
@@ -21,8 +21,7 @@ const DevTeamPlugin: Plugin = async (context) => {
   ]);
   state.updatesMade = filesUpdated.some(Boolean);
 
-  const switcher = new AppendPromptSwitcher(client);
-  const coordinator = new TuiEventCoordinator(client, switcher);
+  const coordinator = new TuiEventCoordinator(client);
 
   return {
     config: configHook(context, logger.child({ category: 'config' }), state),
@@ -38,6 +37,9 @@ const DevTeamPlugin: Plugin = async (context) => {
       ...workflowTools(client, logger, coordinator),
     },
     event: async ({ event }) => {
+      if (event.type === 'tui.command.execute') {
+        coordinator.handleCommand((event.properties as { command?: string }).command ?? '');
+      }
       if (event.type === "session.updated" ){
         logger.info('session.updated', { info: event.properties.info });
       }

@@ -5,6 +5,7 @@ import { type AgentConfig } from '@opencode-ai/sdk';
 import { readFileSync, readdirSync } from "fs"
 import { join } from "path"
 import matter from "gray-matter"
+import { WORKFLOW_AGENTS } from './workflow-events'
 
 export function configHook(
   context: PluginInput,
@@ -12,6 +13,8 @@ export function configHook(
   state: { errors: PluginError[] }
 ) {
   return async (config: any) => {
+    config.agent ??= {}
+    config.command ??= {}
     const commandsDir = join(import.meta.dir, "commands")
     const REQUIRED_COMMAND_FIELDS = ["description"] as const
 
@@ -97,6 +100,16 @@ export function configHook(
       }
 
       config.agent[agentName] = agent
+    }
+
+    config.default_agent = 'specs'
+    for (const name of ['build', 'plan']) {
+      config.agent[name] = { ...config.agent[name], hidden: true }
+    }
+    for (const [name, agent] of Object.entries(config.agent) as Array<[string, Record<string, unknown>]>) {
+      if (WORKFLOW_AGENTS.includes(name as (typeof WORKFLOW_AGENTS)[number])) continue
+      if (agent.mode === 'subagent') continue
+      agent.hidden = true
     }
 
     logger.info('dev team plugin plugin initialized')
