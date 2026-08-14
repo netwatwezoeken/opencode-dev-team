@@ -69,14 +69,14 @@ Keep scenarios implementation-independent (no databases, selectors, or internal 
 
 ### 3. Create the plan
 
-Write the plan file using the structure in `.opencode/references/plan/plan-template.md` (goal,
+Write the plan file using the structure in `.opencode/references/planner/plan-template.md` (goal,
 acceptance criteria, per-slice Gherkin + TDD steps, parallelization DAG, complexity
 classification, pre-PR gate, skipped-findings, risks, and the machine-parseable
 Build Progress section).
 
 #### Resolve the Gherkin persistence decision
 
-Follow `.opencode/references/plan/gherkin-persistence.md`: honor a re-run's recorded
+Follow `.opencode/references/planner/gherkin-persistence.md`: honor a re-run's recorded
 decision, otherwise detect the project's BDD convention, prompt once —
 or log a skip when non-interactive — and record + echo the resulting
 `**Gherkin persistence**:` metadata line (destination directory only). No
