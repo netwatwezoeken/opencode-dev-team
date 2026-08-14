@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import {
   TuiEventCoordinator,
@@ -198,5 +199,14 @@ describe('TUI package module', () => {
     const mod = await import('./tui.js');
     expect((mod.default as { tui?: unknown }).tui).toBe(WorkflowTuiPlugin);
     expect((mod.default as { server?: unknown }).server).toBeUndefined();
+  });
+
+  it('declares dedicated server and TUI package entry points', async () => {
+    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+      exports?: Record<string, { default?: string }>;
+    };
+
+    expect(pkg.exports?.['./server']?.default).toBe('./dist/index.js');
+    expect(pkg.exports?.['./tui']?.default).toBe('./dist/tui.js');
   });
 });
