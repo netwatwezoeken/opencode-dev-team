@@ -61,8 +61,9 @@ transition failure with a discriminating reason, never a silent success.
 - **`specs` is the ring default-first.** Established in
   `plans/tui-active-agent-follows-workflow.md` (visible ring constrained to the
   three workflow agents, `specs` default). The default-relative math depends on
-  this; Slice 2 asserts it as an invariant in a test rather than leaving it
-  implicit.
+  this. The approved workflow ring order is **`[specs, planner, builder]`**;
+  Slice 2 asserts the complete order as an invariant rather than relying on
+  incidental host enumeration order.
 - **The ack coordinator lives SERVER-side and survives `session.new`.**
   `TuiEventCoordinator` is instantiated in `src/index.ts` (the `DevTeamPlugin`
   server plugin), and its `pending` Map is held in that server-plugin instance.
@@ -92,11 +93,11 @@ transition failure with a discriminating reason, never a silent success.
 ## Acceptance Criteria
 
 - [ ] **AC1 — Fresh context on every transition.** On both specs→planner and planner→builder, the companion dispatches `session.new` exactly once before selecting the target agent (unit-verifiable via the `clearSession` fake). The live "no prior-step LLM history" guarantee is confirmed by the Slice 0 pre-flight (below).
-- [ ] **AC2 — Target agent selected by name.** After the clear, the companion lands on the transition's `targetAgent` by cycling `(targetIndex − defaultIndex + N) mod N` times from the ring's default (first) position — not from `sourceAgent`. When the target equals the default, zero cycles are dispatched. Verified for both transitions.
+- [ ] **AC2 — Target agent selected by name.** After the clear, the companion lands on the transition's `targetAgent` by cycling `(targetIndex − defaultIndex + N) mod N` times through the approved visible ring `[specs, planner, builder]` from its default (first) position — not from `sourceAgent` or incidental host enumeration order. When the target equals the default, zero cycles are dispatched. Verified for both specs→planner and planner→builder transitions.
 - [ ] **AC3 — Optional bare slug is the workflow-handoff token.** The transition payload may omit `slug`; when present it must be a non-empty string. Agent prompts instruct specs to hand over the bare slug and planner/builder to resolve `docs/specs/<slug>.md` / `plans/<slug>.md` from it; omission preserves existing artifact-discovery fallback behavior.
 - [ ] **AC4 — `reference` renamed to `slug` throughout.** `workflow_advance`'s arg, the optional `WorkflowSelectionInput`/payload field, `createTransitionPayload`, the type guard, and all workflow tests use `slug`; `workflow_start` omits it. Legacy transition payloads containing `reference` are rejected (resource-install "references" untouched).
-- [ ] **AC5 — Failure is surfaced with a discriminating reason.** A failed `session.new` and a failed agent selection are each reported through `WORKFLOW_TRANSITION_FAILED` with a non-empty, distinguishable reason string (clear-failure vs. cycle-failure); no acknowledgement is published on either failure, and `workflow_advance` returns `[ERROR]`.
-- [ ] **AC6 — Acknowledgement round-trips after clear + select.** On success, `WORKFLOW_TRANSITION_ACKNOWLEDGED` is published only after `clearSession()` and all `agent.cycle` dispatches complete, and `workflow_advance` returns a success string naming the target agent.
+- [ ] **AC5 — Failure is surfaced with a discriminating reason.** A failed `session.new` and a failed agent selection are each reported through `WORKFLOW_TRANSITION_FAILED` with a non-empty reason that explicitly names the failed command (`session.new failed: <cause>` vs. `agent.cycle failed: <cause>`); no acknowledgement is published on either failure, and `workflow_advance` returns `[ERROR]`.
+- [ ] **AC6 — Acknowledgement round-trips after clear + select.** On success, `WORKFLOW_TRANSITION_ACKNOWLEDGED` is published strictly after synchronous `clearSession()` and every synchronous `agent.cycle` dispatch returns successfully — never before or concurrently with either command — and `workflow_advance` returns a success string naming the target agent.
 - [ ] **AC7 — Standalone builder discovery preserved.** `builder.md` still instructs the standalone (non-transition) path to use the most-recently-modified approved plan; a test guards this prose from accidental removal.
 
 ## Slices
@@ -270,16 +271,16 @@ Feature: Transition clears context and lands on the target by name
 **Complexity**: standard
 **IMPLEMENT**: Add `clearSession(): { ok: true } | { ok: false; reason: string }` to `TuiCompanionDeps`, wired in `WorkflowTuiPlugin` to dispatch `session.new` via the same keymap/command path as `agent.cycle` (synchronous shape, mirroring `dispatchAgentCycle`).
 **TEST**: In `tui.test.ts`, extend `makeDeps` with a `clearSession` fake defaulting to `{ ok: true }`; assert the wired dep dispatches `session.new`. Full suite green.
-**REFACTOR**: Keep the dep surface consistent with `dispatchAgentCycle` (naming, return shape); no duplicated command strings.
+**REFACTOR**: Keep the dep surface consistent with `dispatchAgentCycle` (naming, return shape). Wire `session.new` once through `api.keymap.dispatchCommand('session.new')`, adjacent to the existing canonical `api.keymap.dispatchCommand('agent.cycle')` wiring; do not introduce duplicate wrappers or command-string copies.
 **Files**: `src/tui.ts`, `src/tui.test.ts`
 **Commit**: `feat(tui): add clearSession dep dispatching session.new`
 
 #### Step 2.2: Clear then select-by-name in one change (clear + default-relative distance)
 
 **Complexity**: complex
-**IMPLEMENT**: In `handleTransitionCommand`, after ring validation: (1) call `clearSession()`; on failure `publishFailure(..., "<session clear reason>")` and return (no cycle, no ack). (2) Compute `defaultIndex` = index of the ring's first/default agent and assert the workflow-ring invariant (`ring[0] === "specs"`); compute `distance = (targetIndex − defaultIndex + N) mod N`; dispatch `agent.cycle` that many times, preserving the existing per-cycle failure handling (its reason must name the cycle). (3) Publish the acknowledgement only after the clear and all cycles succeed. **Remove** the source-relative distance formula and the now-unused `sourceIndex` computation; retain `sourceAgent` in the payload only as data (do not use it for targeting). Add a pre-clear operator toast: `[workflow] clearing context for <targetAgent> handoff…`. This is a **single commit** so the source-relative formula never coexists with an active clear (no broken intermediate live state).
-**TEST**: Rework `handleTransitionCommand` tests to the default-relative model: specs→planner (1 cycle), planner→builder, source≠default proves default→target not source→target, zero-distance (target=default) dispatches 0 cycles, clear-failure → failed event naming the clear + no cycle + no ack, cycle-failure → failed event naming the cycle + no ack, ordering (clear → cycles → ack; ack never before clear). Keep the non-workflow-ring and agent-list-failure cases green. Assert `ring[0] === "specs"` invariant. Full suite green.
-**REFACTOR**: Delete dead source-relative logic; ensure no misleading references to source-relative cycling or a queryable active agent remain. Confirm the clear-vs-select ordering is explicit and commented.
+**IMPLEMENT**: In `handleTransitionCommand`, after ring validation: (1) require the load-bearing complete workflow-ring invariant `ring === ["specs", "planner", "builder"]`; a violation follows the existing ring-mismatch failure path, publishes `WORKFLOW_TRANSITION_FAILED`, and returns before clear, cycle, or acknowledgement. (2) Show the pre-clear operator toast `[workflow] clearing context for <targetAgent> handoff…`, where `<targetAgent>` is the literal workflow agent name such as `planner` or `builder`. (3) Call synchronous `clearSession()`; on failure publish `session.new failed: <returned reason>` and return (no cycle, no ack). (4) Compute `defaultIndex = 0` from the validated first/default agent and `distance = (targetIndex − defaultIndex + N) mod N`; synchronously dispatch `agent.cycle` that many times. Preserve the existing per-cycle failure path by publishing `agent.cycle failed: <returned reason>` and returning without acknowledgement. (5) Publish the acknowledgement only after clear and every cycle return successfully. **Remove** the exact source-relative formula `distance = (targetIndex - sourceIndex + N) % N` and the now-unused `sourceIndex` computation; retain `sourceAgent` in the payload only as data (do not use it for targeting). This is a **single commit** so the source-relative formula never coexists with an active clear (no broken intermediate live state).
+**TEST**: Rework `handleTransitionCommand` tests to the default-relative model: approved ring `[specs, planner, builder]`; specs→planner (1 cycle), planner→builder (2 cycles), source≠default proves default→target not source→target, zero-distance (target=default) dispatches 0 cycles, complete-order invariant violations fail before clear/cycle/ack, clear-failure → failed event containing `session.new failed` + no cycle + no ack, cycle-failure → failed event containing `agent.cycle failed` + no ack, and synchronous call ordering recorded as clear → every cycle → acknowledgement. Keep the non-workflow-ring and agent-list-failure cases green. Full suite green.
+**REFACTOR**: Delete the source-relative formula and `sourceIndex` computation; ensure no misleading references to source-relative cycling or a queryable active agent remain. Confirm the synchronous clear-before-select ordering is explicit and commented.
 **Files**: `src/tui.ts`, `src/tui.test.ts`
 **Commit**: `feat(tui): clear session and select target agent by name from ring default`
 
@@ -418,9 +419,9 @@ This section is the machine-parseable recovery handle. `/builder` updates checkb
 - [x] Slice 1: Rename `reference` → `slug` across the workflow protocol
   - [x] Step 1.1: Rename the field on the event contract and tighten its guard
   - [x] Step 1.2: Rename the arg in `workflow_advance` AND the payload in `workflow_start`
-- [ ] Slice 2: Clear context and select the target agent by name
-  - [ ] Step 2.1: Add a synchronous `clearSession` capability to the companion deps
-  - [ ] Step 2.2: Clear then select-by-name in one change (clear + default-relative distance)
+- [x] Slice 2: Clear context and select the target agent by name
+  - [x] Step 2.1: Add a synchronous `clearSession` capability to the companion deps
+  - [x] Step 2.2: Clear then select-by-name in one change (clear + default-relative distance)
 - [ ] Slice 3: Teach the agents to hand over / consume the bare slug (with a regression guard)
   - [ ] Step 3.1: Add an executable prompt-assertion test (write test first)
   - [ ] Step 3.2: Update `specs.md`, `planner.md`, `builder.md` to satisfy the test

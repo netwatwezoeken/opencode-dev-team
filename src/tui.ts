@@ -115,6 +115,7 @@ function parseCommandPayload(command: string, eventName: string): unknown {
 export interface TuiCompanionDeps {
   listAgents(): Promise<Array<{ name: string; mode: string; hidden?: boolean }>>;
   dispatchAgentCycle(): { ok: true } | { ok: false; reason: string };
+  clearSession(): { ok: true } | { ok: false; reason: string };
   publishCommand(command: string): Promise<void>;
   toast(message: string, variant: 'info' | 'error'): void;
 }
@@ -125,6 +126,90 @@ function visibleAgentRing(
   return agents
     .filter((agent) => agent.mode !== 'subagent' && agent.hidden !== true)
     .map((agent) => agent.name);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Returns true only when the visible ring is exactly ['specs', 'planner', 'builder']. */
+function isApprovedRing(ring: string[]): boolean {
+  return (
+    ring.length === WORKFLOW_AGENTS.length &&
+    WORKFLOW_AGENTS.every((agent, i) => ring[i] === agent)
+  );
+}
+
+
+type ApprovedRingResult =
+  | { ok: true; ring: string[] }
+  | { ok: false };
+
+/** Retrieves the visible agent ring and validates it is the approved workflow ring.
+ *  On failure, publishes a WORKFLOW_TRANSITION_FAILED command and returns `{ ok: false }`. */
+async function retrieveApprovedRing(
+  payload: WorkflowTransitionRequestedPayload,
+  deps: TuiCompanionDeps,
+): Promise<ApprovedRingResult> {
+  let ring: string[];
+  try {
+    ring = visibleAgentRing(await deps.listAgents());
+  } catch (error) {
+    await publishFailure(payload, `could not read the TUI agent ring: ${errorMessage(error)}`, deps);
+    return { ok: false };
+  }
+  if (!isApprovedRing(ring)) {
+    await publishFailure(
+      payload,
+      `workflow agent ring mismatch; expected ${WORKFLOW_AGENTS.join(', ')} in exact order, got ${ring.join(', ')}`,
+      deps,
+    );
+    return { ok: false };
+  }
+  return { ok: true, ring };
+}
+
+/** Clears the current session via `session.new`.
+ *  On failure, publishes a WORKFLOW_TRANSITION_FAILED command and returns `false`. */
+async function clearSessionOrFail(
+  payload: WorkflowTransitionRequestedPayload,
+  deps: TuiCompanionDeps,
+): Promise<boolean> {
+  let result: ReturnType<TuiCompanionDeps['clearSession']>;
+  try {
+    result = deps.clearSession();
+  } catch (error) {
+    await publishFailure(payload, `session.new failed: ${errorMessage(error)}`, deps);
+    return false;
+  }
+  if (!result.ok) {
+    await publishFailure(payload, `session.new failed: ${result.reason}`, deps);
+    return false;
+  }
+  return true;
+}
+
+/** Dispatches `distance` agent.cycle commands.
+ *  On the first failure, publishes a WORKFLOW_TRANSITION_FAILED command and returns `false`. */
+async function runCycles(
+  distance: number,
+  payload: WorkflowTransitionRequestedPayload,
+  deps: TuiCompanionDeps,
+): Promise<boolean> {
+  for (let index = 0; index < distance; index += 1) {
+    let result: ReturnType<TuiCompanionDeps['dispatchAgentCycle']>;
+    try {
+      result = deps.dispatchAgentCycle();
+    } catch (error) {
+      await publishFailure(payload, `agent.cycle failed: ${errorMessage(error)}`, deps);
+      return false;
+    }
+    if (!result.ok) {
+      await publishFailure(payload, `agent.cycle failed: ${result.reason}`, deps);
+      return false;
+    }
+  }
+  return true;
 }
 
 export async function handleTransitionCommand(
@@ -139,39 +224,19 @@ export async function handleTransitionCommand(
     return;
   }
 
-  let ring: string[];
+  const ringResult = await retrieveApprovedRing(payload, deps);
+  if (!ringResult.ok) return;
+
+  const targetIndex = ringResult.ring.indexOf(payload.targetAgent);
+
   try {
-    ring = visibleAgentRing(await deps.listAgents());
-  } catch (error) {
-    await publishFailure(
-      payload,
-      `could not read the TUI agent ring: ${error instanceof Error ? error.message : String(error)}`,
-      deps,
-    );
-    return;
-  }
-  const workflowOnly =
-    ring.length === WORKFLOW_AGENTS.length &&
-    WORKFLOW_AGENTS.every((agent) => ring.includes(agent));
-  const sourceIndex = ring.indexOf(payload.sourceAgent);
-  const targetIndex = ring.indexOf(payload.targetAgent);
-  if (!workflowOnly || sourceIndex === -1 || targetIndex === -1) {
-    await publishFailure(
-      payload,
-      `workflow agent ring mismatch; expected only ${WORKFLOW_AGENTS.join(', ')}, got ${ring.join(', ')}`,
-      deps,
-    );
-    return;
+    deps.toast(`[workflow] clearing context for ${payload.targetAgent} handoff…`, 'info');
+  } catch {
+    // Informational toast failure must not block the destructive transition sequence.
   }
 
-  const distance = (targetIndex - sourceIndex + ring.length) % ring.length;
-  for (let index = 0; index < distance; index += 1) {
-    const result = deps.dispatchAgentCycle();
-    if (!result.ok) {
-      await publishFailure(payload, `agent.cycle failed: ${result.reason}`, deps);
-      return;
-    }
-  }
+  if (!(await clearSessionOrFail(payload, deps))) return;
+  if (!(await runCycles(targetIndex, payload, deps))) return;
 
   const acknowledged: WorkflowTransitionAcknowledgedPayload = {
     requestId: payload.requestId,
@@ -200,8 +265,8 @@ async function publishFailure(
   deps.toast(`[ERROR] Workflow transition failed: ${message}`, 'error');
 }
 
-export const WorkflowTuiPlugin: TuiPlugin = async (api) => {
-  const deps: TuiCompanionDeps = {
+function buildTuiDeps(api: Parameters<TuiPlugin>[0]): TuiCompanionDeps {
+  return {
     async listAgents() {
       const result = await api.client.app.agents();
       if (result.error || !result.data) {
@@ -211,6 +276,10 @@ export const WorkflowTuiPlugin: TuiPlugin = async (api) => {
     },
     dispatchAgentCycle() {
       const result = api.keymap.dispatchCommand('agent.cycle');
+      return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+    },
+    clearSession() {
+      const result = api.keymap.dispatchCommand('session.new');
       return result.ok ? { ok: true } : { ok: false, reason: result.reason };
     },
     async publishCommand(command) {
@@ -228,6 +297,10 @@ export const WorkflowTuiPlugin: TuiPlugin = async (api) => {
       api.ui.toast({ variant, message });
     },
   };
+}
+
+export const WorkflowTuiPlugin: TuiPlugin = async (api) => {
+  const deps = buildTuiDeps(api);
 
   const unsubscribe = api.event.on('tui.command.execute', (event) => {
     const command = (event.properties as { command?: string }).command ?? '';

@@ -62,12 +62,14 @@ export function workflowTools(
         current: tool.schema
           .enum(['specs', 'planner', 'builder'])
           .describe('The step that is being approved.'),
-        reference: tool.schema
+        slug: tool.schema
           .string()
-          .describe('name of the spec file.'),
+          .min(1)
+          .optional()
+          .describe('Optional bare artifact slug (e.g. the spec or plan filename without extension). Omit when no artifact is associated.'),
       },
-      async execute({ approve, current, reference }, ctx) {
-        logger.info('workflow_advance called', { approve, current, reference, sessionID: ctx.sessionID });
+      async execute({ approve, current, slug }, ctx) {
+        logger.info('workflow_advance called', { approve, current, slug, sessionID: ctx.sessionID });
         const step = current as Step;
 
         if (!approve) {
@@ -80,7 +82,7 @@ export function workflowTools(
           return `Workflow complete. All steps (specs → planner → builder) approved.`;
         }
 
-        const payload = createTransitionPayload(step, ctx.agent, reference);
+        const payload = createTransitionPayload(step, ctx.agent, slug);
         if (!payload) {
           // Defensive: createTransitionPayload returns null only for 'builder', caught above.
           return `[ERROR] "${step}" workflow transition event could not be published.`;
@@ -153,7 +155,6 @@ export function workflowTools(
               nextStep: start,
               sourceAgent: ctx.agent,
               targetAgent: start,
-              reference: '',
             },
             ctx.directory,
           );

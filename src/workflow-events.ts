@@ -15,11 +15,12 @@ export interface WorkflowSelectionInput {
   nextStep: Step;
   sourceAgent: string;
   targetAgent: Step;
-  reference: string;
+  slug?: string;
 }
 
 export interface WorkflowTransitionRequestedPayload extends WorkflowSelectionInput {
   requestId: string;
+  slug?: string;
 }
 
 export interface WorkflowTransitionAcknowledgedPayload {
@@ -45,11 +46,13 @@ export interface WorkflowTransitionCoordinator {
 export function createTransitionPayload(
   currentStep: Step,
   sourceAgent: string,
-  reference: string,
+  slug?: string,
 ): WorkflowSelectionInput | null {
   if (currentStep === 'builder') return null;
   const nextStep = STEP_AGENT[currentStep];
-  return { nextStep, sourceAgent, targetAgent: nextStep, reference };
+  const payload: WorkflowSelectionInput = { nextStep, sourceAgent, targetAgent: nextStep };
+  if (slug !== undefined) payload.slug = slug;
+  return payload;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -64,13 +67,17 @@ export function isTransitionRequestedPayload(
   value: unknown,
 ): value is WorkflowTransitionRequestedPayload {
   if (!isObject(value)) return false;
-  return (
-    typeof value.requestId === 'string' &&
-    isStep(value.nextStep) &&
-    typeof value.sourceAgent === 'string' &&
-    isStep(value.targetAgent) &&
-    typeof value.reference === 'string'
-  );
+  if (
+    typeof value.requestId !== 'string' ||
+    !isStep(value.nextStep) ||
+    typeof value.sourceAgent !== 'string' ||
+    !isStep(value.targetAgent)
+  ) return false;
+  // slug is optional; when present it must be a non-empty string
+  if ('slug' in value && (typeof value.slug !== 'string' || value.slug.length === 0)) return false;
+  // legacy 'reference' field is explicitly rejected — any payload carrying it is invalid
+  if ('reference' in value) return false;
+  return true;
 }
 
 export function isTransitionAcknowledgedPayload(

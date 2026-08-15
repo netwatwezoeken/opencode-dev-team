@@ -1,2 +1,3 @@
 {"timestamp":"2026-08-14T23:24:17Z","plan":"plans/clear-session-context-between-workflow-steps.md","slice":"0","branch":"new-mechanism","files":[],"outcome":"skipped","reason":"pre-flight verification only; no source or runtime files changed"}
 {"timestamp":"2026-08-15T05:56:47Z","plan":"plans/clear-session-context-between-workflow-steps.md","slice":"1","branch":"new-mechanism","files":["src/workflow-events.ts","src/workflow.ts","wiremock/__files/workflow_advance-specs-approved.json","wiremock/__files/workflow_advance-builder-final.json"],"outcome":"ran"}
+{"timestamp":"2026-08-15T09:06:00Z","plan":"plans/clear-session-context-between-workflow-steps.md","slice":"2","branch":"new-mechanism","files":["src/tui.ts"],"outcome":"ran"}
