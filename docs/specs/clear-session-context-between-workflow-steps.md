@@ -15,13 +15,13 @@ The clear happens on **every** transition. After clearing, the companion navigat
 
 - `src/tui.ts` — `handleTransitionCommand` (companion side): the transition handler currently issues N × `agent.cycle` to walk the ring from source to target. This must change to (a) clear session context and (b) select the target agent **by name**.
 - `src/tui.ts` — `TuiCompanionDeps`: add a capability to clear the session (`session.new`) and, if not already available, to select an agent by name rather than only cycling. Existing deps (`listAgents`, `dispatchAgentCycle`, `publishCommand`, `toast`) are the pattern to follow.
-- `src/workflow.ts` — `workflow_advance` tool: the `reference` argument is **renamed to `slug`** and carries the bare feature slug (e.g. `clear-session-context-between-workflow-steps`), not a file path.
+- `src/workflow.ts` — `workflow_advance` tool: the optional `reference` argument is **renamed to optional `slug`** and, when provided, carries the bare feature slug (e.g. `clear-session-context-between-workflow-steps`), not a file path.
 - `src/workflow-events.ts` — `WorkflowSelectionInput`, the transition payloads, and `createTransitionPayload`: the `reference` field is **renamed to `slug`** and its type-guard validation updated accordingly. `targetAgent` already carries the target agent name, so no additional protocol change is required for name-based targeting.
 - The ack/timeout coordinator is session-scoped and must continue to resolve correctly across the clear.
 
 **Handover token: the bare slug**
 
-- The single value handed between steps is the bare `<slug>` — no directory, no extension, no path.
+- The optional value handed between steps is the bare `<slug>` — no directory, no extension, no path. Omission is valid; when omitted, the receiving step retains its existing artifact-discovery fallback.
 - Each step maps the slug to its own artifact path: planner reads `docs/specs/<slug>.md`; builder reads `plans/<slug>.md`.
 - This **replaces** builder's current "most-recently-modified approved plan in `plans/`" discovery for the workflow-driven path: the slug names the plan explicitly. (Builder's standalone discovery behavior when invoked outside a transition is out of scope and unchanged.)
 
@@ -38,7 +38,7 @@ The clear happens on **every** transition. After clearing, the companion navigat
 
 **Constraints**
 
-- The `workflow_advance` tool's argument shape changes only by the `reference`→`slug` rename; `approve` and `current` are unchanged.
+- The `workflow_advance` tool's argument shape changes only by the optional `reference`→optional `slug` rename; `approve` and `current` are unchanged.
 - Do not change the file **contents** each step writes; change only the handover token and the next step's resolution of its artifact from the slug.
 - Timeout and failure semantics (`WORKFLOW_TRANSITION_FAILED`, timeout → `[ERROR]` message) must be preserved: a failure to clear or to select the target agent is a transition failure, surfaced the same way as an `agent.cycle` failure is today.
 - The `reference`→`slug` rename must be applied consistently across the tool arg, event payloads, type guards, and all references in code and tests.
@@ -47,8 +47,9 @@ The clear happens on **every** transition. After clearing, the companion navigat
 
 1. **Fresh context on every transition.** After `workflow_advance` is approved for specs→planner and for planner→builder, the next step's agent operates in a session with no conversation history from prior steps (equivalent to `/new`). — *NO_REFACTOR*
 2. **Target agent selected by name.** After the clear, the TUI's active primary agent is the transition's `targetAgent`, selected by name — not derived from source→target cycle distance. Verified for both transitions. — *NO_REFACTOR*
-3. **Bare slug is the handover token.** The transition carries the bare `<slug>` (no path, no extension). The next step resolves its artifact from the slug: planner reads `docs/specs/<slug>.md`; builder reads `plans/<slug>.md`. No step relies on chat history or on modified-time discovery for the workflow-driven handoff. — *NO_REFACTOR*
+3. **Optional bare slug is the handover token.** The transition may carry a bare `<slug>` (no path, no extension). When provided, the next step resolves its artifact from the slug: planner reads `docs/specs/<slug>.md`; builder reads `plans/<slug>.md`. Omission is valid and preserves the receiving step's existing artifact-discovery fallback. — *NO_REFACTOR*
 4. **`reference` renamed to `slug` throughout.** The `workflow_advance` `slug` argument, the `WorkflowSelectionInput`/payload `slug` field, `createTransitionPayload`, and the type guards all use `slug`; no `reference` naming remains in the workflow code or its tests. — *NO_REFACTOR*
+   Legacy transition payloads carrying `reference` are rejected even when optional `slug` is omitted.
 5. **Failure is surfaced, not swallowed.** If clearing the session or selecting the target agent fails, the transition is reported as a failure through the existing `WORKFLOW_TRANSITION_FAILED` / `[ERROR]` path, and the workflow does not silently claim success. — *NO_REFACTOR*
 6. **Acknowledgement still round-trips.** On success, `WORKFLOW_TRANSITION_ACKNOWLEDGED` is published and `workflow_advance` returns its success message naming the target agent, exactly as today. — *NO_REFACTOR*
 
@@ -62,6 +63,7 @@ The clear happens on **every** transition. After clearing, the companion navigat
 | Agent targeting after reset | `requires-stakeholder-input` | human | User: "target by name." Payload already carries `targetAgent` name; replace cycle-distance walk with by-name selection. |
 | Handover token: bare slug vs. file path | `requires-stakeholder-input` | human | User: "yes bare slug." The single value handed between steps is the bare `<slug>`; each step composes its own path (`docs/specs/<slug>.md`, `plans/<slug>.md`). Replaces builder's modified-time discovery for the workflow path. |
 | Field/parameter naming | `requires-stakeholder-input` | human | User: "also use that in code instead of reference." Rename `reference`→`slug` across tool arg, payloads, guards, and tests. |
+| Slug required vs. optional | `requires-stakeholder-input` | human | User: "Make the slug always optional." The field may be omitted on any transition; when present it carries the bare slug. `workflow_start` omits it. |
 | Exact clear-vs-select ordering | `inferable` | inference | Design detail for the plan; observable requirement (fresh context + correct active agent at completion) fully constrains it. Left to `/planner`. |
 
 ## Consistency Gate

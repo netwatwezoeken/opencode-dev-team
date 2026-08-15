@@ -93,8 +93,8 @@ transition failure with a discriminating reason, never a silent success.
 
 - [ ] **AC1 — Fresh context on every transition.** On both specs→planner and planner→builder, the companion dispatches `session.new` exactly once before selecting the target agent (unit-verifiable via the `clearSession` fake). The live "no prior-step LLM history" guarantee is confirmed by the Slice 0 pre-flight (below).
 - [ ] **AC2 — Target agent selected by name.** After the clear, the companion lands on the transition's `targetAgent` by cycling `(targetIndex − defaultIndex + N) mod N` times from the ring's default (first) position — not from `sourceAgent`. When the target equals the default, zero cycles are dispatched. Verified for both transitions.
-- [ ] **AC3 — Bare slug is the handover token.** The transition payload carries a non-empty bare `<slug>` (no path, no extension); the type guard rejects a payload whose `slug` is empty, absent, or non-string. Agent prompts instruct specs to hand over the slug and planner/builder to resolve `docs/specs/<slug>.md` / `plans/<slug>.md` from it.
-- [ ] **AC4 — `reference` renamed to `slug` throughout.** `workflow_advance`'s arg, `workflow_start`'s payload field, the `WorkflowSelectionInput`/payload field, `createTransitionPayload`, the type guard, and all workflow tests use `slug`; no `reference` naming remains in the workflow code or its tests (resource-install "references" untouched).
+- [ ] **AC3 — Optional bare slug is the workflow-handoff token.** The transition payload may omit `slug`; when present it must be a non-empty string. Agent prompts instruct specs to hand over the bare slug and planner/builder to resolve `docs/specs/<slug>.md` / `plans/<slug>.md` from it; omission preserves existing artifact-discovery fallback behavior.
+- [ ] **AC4 — `reference` renamed to `slug` throughout.** `workflow_advance`'s arg, the optional `WorkflowSelectionInput`/payload field, `createTransitionPayload`, the type guard, and all workflow tests use `slug`; `workflow_start` omits it. Legacy transition payloads containing `reference` are rejected (resource-install "references" untouched).
 - [ ] **AC5 — Failure is surfaced with a discriminating reason.** A failed `session.new` and a failed agent selection are each reported through `WORKFLOW_TRANSITION_FAILED` with a non-empty, distinguishable reason string (clear-failure vs. cycle-failure); no acknowledgement is published on either failure, and `workflow_advance` returns `[ERROR]`.
 - [ ] **AC6 — Acknowledgement round-trips after clear + select.** On success, `WORKFLOW_TRANSITION_ACKNOWLEDGED` is published only after `clearSession()` and all `agent.cycle` dispatches complete, and `workflow_advance` returns a success string naming the target agent.
 - [ ] **AC7 — Standalone builder discovery preserved.** `builder.md` still instructs the standalone (non-transition) path to use the most-recently-modified approved plan; a test guards this prose from accidental removal.
@@ -150,10 +150,10 @@ Feature: Slug is the transition handover token
     Then the transition payload carries a "slug" field equal to "test-feature-slug"
     And the payload has no "reference" key
 
-  Scenario: workflow_start forwards an (empty) slug the guard accepts
+  Scenario: workflow_start omits the optional slug and the guard accepts it
     Given workflow_start begins the "specs" step
     When it requests the TUI selection
-    Then the payload carries a "slug" field
+    Then the payload has no "slug" field
     And the transition-requested guard accepts that payload
 
   Scenario: the type guard accepts a payload with a non-empty slug
@@ -166,15 +166,19 @@ Feature: Slug is the transition handover token
     And a "reference" field and no "slug" field
     Then the guard rejects it
 
-  Scenario: the type guard rejects an empty slug
+  Scenario: the tool rejects an explicitly empty optional slug
+    Given workflow_advance is invoked with an empty slug
+    Then argument validation rejects the call before a transition is requested
+
+  Scenario: the type guard rejects an empty provided slug
     Given a candidate transition-requested payload with valid step and agent fields
     And a "slug" field equal to the empty string
     Then the guard rejects it
 
-  Scenario: the type guard rejects a missing slug
+  Scenario: the type guard accepts a missing optional slug
     Given a candidate transition-requested payload with valid step and agent fields
     And no "slug" field
-    Then the guard rejects it
+    Then the guard accepts it
 ```
 
 **Steps:**
@@ -182,8 +186,8 @@ Feature: Slug is the transition handover token
 #### Step 1.1: Rename the field on the event contract and tighten its guard
 
 **Complexity**: standard
-**IMPLEMENT**: In `src/workflow-events.ts`, rename `reference` → `slug` on `WorkflowSelectionInput`, the `createTransitionPayload` parameter, and `isTransitionRequestedPayload`. Tighten the guard so `slug` must be a **non-empty** string (rejects empty/absent/non-string).
-**TEST**: In `workflow-events.test.ts`: `createTransitionPayload` emits `slug` and no `reference` key; guard accepts non-empty `slug`, rejects `reference`-only, rejects empty `slug`, rejects missing `slug`. Full suite green.
+**IMPLEMENT**: In `src/workflow-events.ts`, rename `reference` → optional `slug` on `WorkflowSelectionInput`, the `createTransitionPayload` parameter, and `isTransitionRequestedPayload`. The guard accepts omission; when provided, `slug` must be a non-empty string.
+**TEST**: In `workflow-events.test.ts`: `createTransitionPayload` emits `slug` and no `reference` key when provided; guard accepts non-empty or omitted `slug`, rejects `reference`-only, empty, and non-string slugs. Full suite green.
 **REFACTOR**: No stray `reference` in this file; one canonical field name. `mise run typecheck` clean.
 **Files**: `src/workflow-events.ts`, `src/workflow-events.test.ts`
 **Commit**: `refactor(workflow): rename transition payload field reference → slug`
@@ -191,8 +195,8 @@ Feature: Slug is the transition handover token
 #### Step 1.2: Rename the arg in `workflow_advance` AND the payload in `workflow_start`
 
 **Complexity**: standard
-**IMPLEMENT**: In `src/workflow.ts`, rename the `workflow_advance` `reference` arg (schema + destructuring + log field) to `slug` and pass it to `createTransitionPayload`; **and** rename `workflow_start`'s `reference: ''` → `slug: ''` in its `coordinator.select` call.
-**TEST**: Update `workflow.test.ts` `workflow_advance` call sites to pass `slug` and assert `coordinator.select` receives `{ …, slug }`; add/adjust a `workflow_start` assertion that its payload carries `slug`. Update `tui.test.ts` `SELECTION` + inline payloads and `dev-team.e2e.ts` field references. Full suite green.
+**IMPLEMENT**: In `src/workflow.ts`, rename the optional `workflow_advance` `reference` arg (schema + destructuring + log field) to optional `slug` and pass it to `createTransitionPayload`; **and** omit `slug` from `workflow_start`'s `coordinator.select` call.
+**TEST**: Update `workflow.test.ts` `workflow_advance` call sites to pass `slug` where relevant and assert `coordinator.select` receives it; assert explicit empty slugs are rejected at the tool boundary; add/adjust a `workflow_start` assertion that its payload omits `slug`. Update `tui.test.ts` `SELECTION` + inline payloads, WireMock fixtures, and `dev-team.e2e.ts` field references. Full suite green.
 **REFACTOR**: Grep `src/` (workflow code + tests) to confirm no `reference` remains; resource-install `references` in `index.ts`/`install.ts` deliberately untouched.
 **Files**: `src/workflow.ts`, `src/workflow.test.ts`, `src/tui.test.ts`, `src/test/dev-team.e2e.ts`
 **Commit**: `refactor(workflow): rename workflow_advance/workflow_start field reference → slug`
@@ -411,9 +415,9 @@ This section is the machine-parseable recovery handle. `/builder` updates checkb
 - [x] Slice 0: Pre-flight — confirm the two load-bearing runtime assumptions
   - [x] Step 0.1: Confirm `session.new` post-clear active agent
   - [x] Step 0.2: Confirm the ack coordinator survives `session.new`
-- [ ] Slice 1: Rename `reference` → `slug` across the workflow protocol
-  - [ ] Step 1.1: Rename the field on the event contract and tighten its guard
-  - [ ] Step 1.2: Rename the arg in `workflow_advance` AND the payload in `workflow_start`
+- [x] Slice 1: Rename `reference` → `slug` across the workflow protocol
+  - [x] Step 1.1: Rename the field on the event contract and tighten its guard
+  - [x] Step 1.2: Rename the arg in `workflow_advance` AND the payload in `workflow_start`
 - [ ] Slice 2: Clear context and select the target agent by name
   - [ ] Step 2.1: Add a synchronous `clearSession` capability to the companion deps
   - [ ] Step 2.2: Clear then select-by-name in one change (clear + default-relative distance)
