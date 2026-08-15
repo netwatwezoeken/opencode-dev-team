@@ -18,7 +18,7 @@ const SELECTION: WorkflowSelectionInput = {
   nextStep: 'planner',
   sourceAgent: 'specs',
   targetAgent: 'planner',
-  reference: 'docs/specs/a.md',
+  slug: 'test-feature-slug',
 };
 
 function makeClient(publish = vi.fn().mockResolvedValue({ data: true, error: undefined })) {
@@ -143,7 +143,7 @@ describe('handleTransitionCommand', () => {
         nextStep: 'builder',
         sourceAgent: 'specs',
         targetAgent: 'builder',
-        reference: '',
+        slug: 'test-feature-slug',
       }),
       deps,
     );

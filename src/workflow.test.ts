@@ -45,7 +45,7 @@ describe('workflow_advance', () => {
     const coordinator = makeCoordinator({ status: 'acknowledged', targetAgent: 'planner' });
     const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
-      { approve: true, current: 'specs', reference: 'docs/specs/a.md' },
+      { approve: true, current: 'specs', slug: 'test-feature-slug' },
       makeCtx('specs') as any,
     );
 
@@ -53,7 +53,7 @@ describe('workflow_advance', () => {
       nextStep: 'planner',
       sourceAgent: 'specs',
       targetAgent: 'planner',
-      reference: 'docs/specs/a.md',
+      slug: 'test-feature-slug',
     } satisfies WorkflowSelectionInput, '/project');
     expect(result).toContain('TUI primary agent switched to "planner"');
   });
@@ -62,7 +62,7 @@ describe('workflow_advance', () => {
     const coordinator = makeCoordinator({ status: 'acknowledged', targetAgent: 'builder' });
     const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     await tools.workflow_advance.execute(
-      { approve: true, current: 'planner', reference: 'plans/a.md' },
+      { approve: true, current: 'planner', slug: 'test-plan' },
       makeCtx('planner') as any,
     );
     expect(coordinator.select).toHaveBeenCalledWith(expect.objectContaining({
@@ -79,7 +79,7 @@ describe('workflow_advance', () => {
     });
     const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
-      { approve: true, current: 'planner', reference: 'plans/a.md' },
+      { approve: true, current: 'planner', slug: 'test-plan' },
       makeCtx('planner') as any,
     );
     expect(result).toContain('[ERROR]');
@@ -91,7 +91,7 @@ describe('workflow_advance', () => {
     const coordinator = makeCoordinator({ status: 'timeout', targetAgent: 'planner' });
     const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
-      { approve: true, current: 'specs', reference: 'r' },
+      { approve: true, current: 'specs', slug: 'r' },
       makeCtx('specs') as any,
     );
     expect(result).toContain('[ERROR]');
@@ -103,7 +103,7 @@ describe('workflow_advance', () => {
     const coordinator = makeCoordinator({ status: 'acknowledged', targetAgent: 'builder' });
     const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
-      { approve: false, current: 'planner', reference: 'r' },
+      { approve: false, current: 'planner', slug: 'r' },
       makeCtx('planner') as any,
     );
     expect(coordinator.select).not.toHaveBeenCalled();
@@ -114,13 +114,21 @@ describe('workflow_advance', () => {
     const coordinator = makeCoordinator({ status: 'acknowledged', targetAgent: 'builder' });
     const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
-      { approve: true, current: 'builder', reference: 'r' },
+      { approve: true, current: 'builder', slug: 'r' },
       makeCtx('builder') as any,
     );
     expect(coordinator.select).not.toHaveBeenCalled();
     expect(result).toBe('Workflow complete. All steps (specs → planner → builder) approved.');
   });
+
+  it('schema rejects explicit empty slug (slug: "")', () => {
+    const tools = workflowTools(makeClient() as any, makeLogger(), makeCoordinator({ status: 'acknowledged', targetAgent: 'planner' }));
+    const slugSchema = tools.workflow_advance.args.slug;
+    const result = slugSchema.safeParse('');
+    expect(result.success).toBe(false);
+  });
 });
+
 
 describe('workflow_start', () => {
   it.each(['specs', 'planner', 'builder'] as const)(
@@ -138,6 +146,8 @@ describe('workflow_start', () => {
         sourceAgent: 'build',
         targetAgent: start,
       }), '/project');
+      // workflow_start omits slug entirely — the payload must not carry slug at all
+      expect(coordinator.select.mock.calls[0][0]).not.toHaveProperty('slug');
       expect(result).toContain(`TUI primary agent switched to "${start}"`);
     },
   );
