@@ -31,7 +31,7 @@ You have been invoked with the `/builder` command.
 
 ### 1. Find the plan
 
-If `--plan` was provided, read that file. Otherwise, search `plans/` for `.md` files and find the most recently modified one with `**Status**: approved`. If no approved plan is found, tell the user: "No approved plan found. Run `/planner` first, then approve it."
+If `--plan` was provided, read that file. **Workflow-driven path** (invoked via `workflow_advance` from `/planner`): resolve the plan as `plans/<slug>.md` using the slug handed over by the workflow. **Standalone path** (direct `/builder` invocation): search `plans/` for `.md` files and find the most recently modified one with `**Status**: approved`. If no approved plan is found, tell the user: "No approved plan found. Run `/planner` first, then approve it."
 
 ### 2. Verify plan status
 

@@ -39,7 +39,7 @@ Arguments: $ARGUMENTS
 
 ### 1. Check for spec artifacts
 
-Search for specification artifacts produced by `/specs` — look for files matching `docs/specs/**` or `specs/**` related to the task. Check for the three artifacts: Intent Description, Architecture Specification, and Acceptance Criteria. The spec does **not** contain Gherkin — authoring the behavioral scenarios is this command's job.
+Search for specification artifacts produced by `/specs` — look for files matching `docs/specs/**` or `specs/**` related to the task. When invoked via the workflow (i.e. a slug was handed over by `/specs`), resolve the spec at `docs/specs/<slug>.md` using the handed-over slug. Otherwise, search for the most relevant spec file by task name. Check for the three artifacts: Intent Description, Architecture Specification, and Acceptance Criteria. The spec does **not** contain Gherkin — authoring the behavioral scenarios is this command's job.
 
 If no spec artifacts are found, ask the user: "No specification artifacts found for this task. Run `/specs` first to produce them, or continue planning without specs?"
 
@@ -150,4 +150,4 @@ script no-ops with a note).
 
 ### Auto-trigger /build
 
-After approval and persisting, automatically invoke `/builder` with the feature description. The build command will implement each slice one at a time. Do not ask first — the approved plan is the trigger.
+After approval and persisting, call `workflow_advance` with `approve: true`, `current: "planner"`, and `slug: "<the bare plan slug>"` (for plan `plans/user-login-with-mfa.md`, hand over `user-login-with-mfa`, not a path or filename). The build command will implement each slice one at a time. Do not ask first — the approved plan is the trigger.

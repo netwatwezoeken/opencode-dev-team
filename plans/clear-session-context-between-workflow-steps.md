@@ -2,7 +2,7 @@
 
 **Created**: 2026-08-15
 **Branch**: new-mechanism
-**Status**: approved
+**Status**: implemented
 **Gherkin persistence**: plan-file-only
 <!-- Recorded once at plan creation. No .feature files or BDD convention exist in
      this TypeScript/Vitest repo; behavior is persisted as Vitest tests beside
@@ -422,6 +422,6 @@ This section is the machine-parseable recovery handle. `/builder` updates checkb
 - [x] Slice 2: Clear context and select the target agent by name
   - [x] Step 2.1: Add a synchronous `clearSession` capability to the companion deps
   - [x] Step 2.2: Clear then select-by-name in one change (clear + default-relative distance)
-- [ ] Slice 3: Teach the agents to hand over / consume the bare slug (with a regression guard)
-  - [ ] Step 3.1: Add an executable prompt-assertion test (write test first)
-  - [ ] Step 3.2: Update `specs.md`, `planner.md`, `builder.md` to satisfy the test
+- [x] Slice 3: Teach the agents to hand over / consume the bare slug (with a regression guard)
+  - [x] Step 3.1: Add an executable prompt-assertion test (write test first)
+  - [x] Step 3.2: Update `specs.md`, `planner.md`, `builder.md` to satisfy the test

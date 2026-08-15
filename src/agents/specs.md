@@ -201,7 +201,7 @@ After persisting, automatically invoke `/planner` with the feature description.
 When the user has **explicitly approved** the spec, call `workflow_advance` with:
 - `approve: true`
 - `current: "specs"`
-- `reference: "<path and filname of created spec>"`
+- `slug: "<the bare slug>"` (e.g. `user-login-with-mfa` — the slugified feature name, not a file path or filename)
 
 Do NOT call `workflow_advance` until the user has confirmed the spec is correct.
 

@@ -44,6 +44,14 @@ jobs:
       - name: Test
         run: mise run test
 
+      - name: Build package entry points
+        run: mise run build
+
+      - name: Verify publish artifact
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e 'const files = require("./pack.json")[0].files.map(({ path }) => path); for (const required of ["dist/index.js", "dist/tui.js"]) if (!files.includes(required)) throw new Error(`Missing ${required} from npm package`)'
+
   publish:
     name: Publish
     needs: check
