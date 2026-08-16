@@ -2,7 +2,6 @@ import type { PluginInput } from '@opencode-ai/plugin';
 import type { TuiPlugin } from '@opencode-ai/plugin/tui';
 import {
   DEFAULT_TRANSITION_TIMEOUT_MS,
-  WORKFLOW_AGENTS,
   WORKFLOW_TRANSITION_ACKNOWLEDGED,
   WORKFLOW_TRANSITION_FAILED,
   WORKFLOW_TRANSITION_REQUESTED,
@@ -150,15 +149,13 @@ export async function handleTransitionCommand(
     );
     return;
   }
-  const workflowOnly =
-    ring.length === WORKFLOW_AGENTS.length &&
-    WORKFLOW_AGENTS.every((agent) => ring.includes(agent));
   const sourceIndex = ring.indexOf(payload.sourceAgent);
   const targetIndex = ring.indexOf(payload.targetAgent);
-  if (!workflowOnly || sourceIndex === -1 || targetIndex === -1) {
+  if (sourceIndex === -1 || targetIndex === -1) {
+    const absentAgent = sourceIndex === -1 ? payload.sourceAgent : payload.targetAgent;
     await publishFailure(
       payload,
-      `workflow agent ring mismatch; expected only ${WORKFLOW_AGENTS.join(', ')}, got ${ring.join(', ')}`,
+      `${absentAgent} not found in ring [${ring.join(', ')}]`,
       deps,
     );
     return;

@@ -48,6 +48,21 @@ function request(payload: WorkflowTransitionRequestedPayload): string {
   return `${WORKFLOW_TRANSITION_REQUESTED}:${JSON.stringify(payload)}`;
 }
 
+/**
+ * Assert that publishCommand was called with a WORKFLOW_TRANSITION_FAILED command whose
+ * JSON payload matches the expected fields exactly (structural, order-independent).
+ */
+function expectFailedCommand(
+  publishCommand: ReturnType<typeof vi.fn>,
+  expected: { requestId: string; targetAgent: string; message: string },
+) {
+  const calls: string[] = publishCommand.mock.calls.flat();
+  const failedCall = calls.find((c) => typeof c === 'string' && c.startsWith(`${WORKFLOW_TRANSITION_FAILED}:`));
+  expect(failedCall, 'expected a WORKFLOW_TRANSITION_FAILED command to have been published').toBeDefined();
+  const payload = JSON.parse(failedCall!.slice(`${WORKFLOW_TRANSITION_FAILED}:`.length)) as unknown;
+  expect(payload).toEqual(expected);
+}
+
 describe('TuiEventCoordinator', () => {
   it('waits for a matching TUI acknowledgement', async () => {
     const publish = vi.fn().mockResolvedValue({ data: true, error: undefined });
@@ -158,9 +173,100 @@ describe('handleTransitionCommand', () => {
     );
     expect(deps.dispatchAgentCycle).not.toHaveBeenCalled();
     expect(deps.publishCommand).toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED));
+    expect(deps.publishCommand).not.toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_FAILED));
   });
 
-  it('fails without cycling when the visible ring contains a non-workflow agent', async () => {
+  // AC4: custom-agent ring [specs, review, planner, builder], specs→planner → 2 cycles
+  it('succeeds with a custom agent interspersed in the ring (specs→planner, 2 cycles)', async () => {
+    const deps = makeDeps({
+      listAgents: vi.fn().mockResolvedValue([
+        { name: 'specs', mode: 'primary' },
+        { name: 'review', mode: 'primary' },
+        { name: 'planner', mode: 'all' },
+        { name: 'builder', mode: 'primary' },
+      ]),
+    });
+    await handleTransitionCommand(request({ ...SELECTION, requestId: 'r1' }), deps);
+    expect(deps.dispatchAgentCycle).toHaveBeenCalledTimes(2);
+    expect(deps.publishCommand).toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED));
+    expect(deps.publishCommand).not.toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_FAILED));
+  });
+
+  // AC5: non-canonical ring [specs, builder, planner], specs→planner → 2 cycles
+  it('succeeds with a non-canonical workflow-only ring (specs→planner, 2 cycles)', async () => {
+    const deps = makeDeps({
+      listAgents: vi.fn().mockResolvedValue([
+        { name: 'specs', mode: 'primary' },
+        { name: 'builder', mode: 'primary' },
+        { name: 'planner', mode: 'all' },
+      ]),
+    });
+    await handleTransitionCommand(request({ ...SELECTION, requestId: 'r1' }), deps);
+    expect(deps.dispatchAgentCycle).toHaveBeenCalledTimes(2);
+    expect(deps.publishCommand).toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED));
+    expect(deps.publishCommand).not.toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_FAILED));
+  });
+
+  // AC: ring [specs, review, planner, builder], specs→builder → 3 cycles (traverses review and planner)
+  it('cycles through a custom agent en route to a workflow target (specs→builder, 3 cycles)', async () => {
+    const deps = makeDeps({
+      listAgents: vi.fn().mockResolvedValue([
+        { name: 'specs', mode: 'primary' },
+        { name: 'review', mode: 'primary' },
+        { name: 'planner', mode: 'all' },
+        { name: 'builder', mode: 'primary' },
+      ]),
+    });
+    await handleTransitionCommand(
+      request({ requestId: 'r1', nextStep: 'builder', sourceAgent: 'specs', targetAgent: 'builder', reference: '' }),
+      deps,
+    );
+    expect(deps.dispatchAgentCycle).toHaveBeenCalledTimes(3);
+    expect(deps.publishCommand).toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED));
+    expect(deps.publishCommand).not.toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_FAILED));
+  });
+
+  // AC6/AC9: target builder absent from ring [specs, planner] — exact failure message, no cycle, no ack
+  it('fails with exact message when target agent is absent from the ring', async () => {
+    const deps = makeDeps({
+      listAgents: vi.fn().mockResolvedValue([
+        { name: 'specs', mode: 'primary' },
+        { name: 'planner', mode: 'all' },
+      ]),
+    });
+    await handleTransitionCommand(
+      request({ requestId: 'r1', nextStep: 'builder', sourceAgent: 'specs', targetAgent: 'builder', reference: '' }),
+      deps,
+    );
+    expect(deps.dispatchAgentCycle).not.toHaveBeenCalled();
+    expectFailedCommand(deps.publishCommand, {
+      requestId: 'r1',
+      targetAgent: 'builder',
+      message: 'builder not found in ring [specs, planner]',
+    });
+    expect(deps.publishCommand).not.toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED));
+  });
+
+  // AC7/AC9: source specs absent — exact failure message, no cycle, no ack
+  it('fails with exact message when source agent is absent from the ring', async () => {
+    const deps = makeDeps({
+      listAgents: vi.fn().mockResolvedValue([
+        { name: 'planner', mode: 'all' },
+        { name: 'builder', mode: 'primary' },
+      ]),
+    });
+    await handleTransitionCommand(request({ ...SELECTION, requestId: 'r1' }), deps);
+    expect(deps.dispatchAgentCycle).not.toHaveBeenCalled();
+    expectFailedCommand(deps.publishCommand, {
+      requestId: 'r1',
+      targetAgent: 'planner',
+      message: 'specs not found in ring [planner, builder]',
+    });
+    expect(deps.publishCommand).not.toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED));
+  });
+
+  // AC (fold-in of former Step 1.2): ring [specs, build, planner, builder], specs→planner → 2 cycles, build treated as custom agent
+  it('succeeds when a non-workflow agent (build) is interspersed in the ring (specs→planner, 2 cycles)', async () => {
     const deps = makeDeps({
       listAgents: vi.fn().mockResolvedValue([
         { name: 'specs', mode: 'primary' },
@@ -170,8 +276,9 @@ describe('handleTransitionCommand', () => {
       ]),
     });
     await handleTransitionCommand(request({ ...SELECTION, requestId: 'r1' }), deps);
-    expect(deps.dispatchAgentCycle).not.toHaveBeenCalled();
-    expect(deps.publishCommand).toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_FAILED));
+    expect(deps.dispatchAgentCycle).toHaveBeenCalledTimes(2);
+    expect(deps.publishCommand).toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_ACKNOWLEDGED));
+    expect(deps.publishCommand).not.toHaveBeenCalledWith(expect.stringContaining(WORKFLOW_TRANSITION_FAILED));
   });
 
   it('fails immediately when local command dispatch is rejected', async () => {
