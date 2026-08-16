@@ -176,8 +176,8 @@ Feature: Custom primary agents remain visible after config initialization
 
 - [x] Slice 1: Order-independent transition via presence guard
   - [x] Step 1.1: Replace the workflowOnly exact-ring guard with a presence guard
-- [ ] Slice 2: Show custom primary agents in config-hook
-  - [ ] Step 2.1: Stop hiding non-workflow primary agents
+- [x] Slice 2: Show custom primary agents in config-hook
+  - [x] Step 2.1: Stop hiding non-workflow primary agents
 
 ## Plan Review Summary
 
