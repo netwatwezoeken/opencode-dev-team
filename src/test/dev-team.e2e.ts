@@ -36,7 +36,7 @@ describe('dev-team headless harness', () => {
       timeoutMs: 10_000,
     });
     
-    expectAgentAndModel(messages, { agent: 'specs', modelID: 'gpt-5.5' });
+    expectAgentAndModel(messages, { agent: 'specs', modelID: 'mocked-model-id' });
   }, 20_000);
 });
 

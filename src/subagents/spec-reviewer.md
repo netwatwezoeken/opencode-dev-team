@@ -3,7 +3,6 @@ name: spec-reviewer
 description: Verifies a freshly-implemented unit of work against its acceptance criteria and Gherkin scenarios before quality review runs
 mode: subagent
 tools: Read, Grep, Glob
-model: github-copilot/claude-haiku-4.5
 effort: high
 color: >-
   #4dba85

@@ -2,7 +2,6 @@
 name: complexity-review
 description: Cyclomatic complexity, nesting depth, function size, parameter count
 mode: subagent
-model: github-copilot/claude-haiku-4.5
 effort: high
 color: >-
   #4dba85

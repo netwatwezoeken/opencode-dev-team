@@ -2,7 +2,6 @@
 name: plan-review-ux
 description: Adversarially critiques an implementation plan's usability, accessibility, and error experience before the human plan-review gate; self-skips for plans with no user-facing surface
 mode: subagent
-model: github-copilot/claude-sonnet-4.6
 effort: medium
 color: >-
   #4dba85

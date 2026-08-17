@@ -2,7 +2,6 @@
 name: gherkin-quality-critic
 description: Adversarially reviews freshly-derived or freshly-authored Gherkin scenarios for coverage gaps and positive/negative balance, immediately after generation
 mode: subagent
-model: github-copilot/claude-sonnet-4.6
 effort: medium
 color: >-
   #4dba85

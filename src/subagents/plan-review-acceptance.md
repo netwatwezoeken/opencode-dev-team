@@ -2,7 +2,6 @@
 name: plan-review-acceptance
 description: Adversarially critiques an implementation plan's acceptance criteria, Gherkin scenarios, and step traceability before the human plan-review gate
 mode: subagent
-model: github-copilot/claude-sonnet-4.6
 effort: medium
 color: >-
   #4dba85

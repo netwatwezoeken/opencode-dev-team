@@ -2,7 +2,6 @@
 name: plan-review-design
 description: Adversarially critiques an implementation plan's technical design — coupling, abstraction boundaries, structural risks, and pattern adherence — before the human plan-review gate
 mode: subagent
-model: github-copilot/claude-sonnet-4.6
 effort: medium
 color: >-
   #4dba85

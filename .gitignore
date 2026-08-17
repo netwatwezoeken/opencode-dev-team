@@ -6,3 +6,4 @@ node_modules
 .opencode/skills
 dist
 opencode-dev-team-*.tgz
+.idea

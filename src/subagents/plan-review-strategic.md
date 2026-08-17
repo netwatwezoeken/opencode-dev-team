@@ -2,7 +2,6 @@
 name: plan-review-strategic
 description: Adversarially critiques an implementation plan's problem-solution fit, scope, risk, and opportunity cost before the human plan-review gate
 mode: subagent
-model: github-copilot/claude-sonnet-4.6
 effort: medium
 color: >-
   #4dba85

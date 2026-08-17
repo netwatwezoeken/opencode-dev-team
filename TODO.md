@@ -1,5 +1,6 @@
 - **Performance Metrics**: `hallucination_detected`, `rework_cycles`, `defects_found` are logged automatically by `hooks/task_completion_metrics.py` --> .claude/session-metrics.json
 - Concurrency?
+- Fix ${CLAUDE_PLUGIN_ROOT}/scripts/detect_bdd_convention.py
 - .claude/memory/
 - feedback learning
 - Mutation Testing skill (referenced by software engineer.md)

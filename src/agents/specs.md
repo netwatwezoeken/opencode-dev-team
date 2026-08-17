@@ -4,7 +4,6 @@ description: >-
 mode: primary
 color: >-
   #4dba85
-model: github-copilot/claude-opus-4.8
 permission:
   edit:
     "*": deny

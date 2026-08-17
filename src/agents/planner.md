@@ -8,7 +8,6 @@ description: >-
 mode: all
 color: >-
   #b8d7a3
-model: github-copilot/claude-opus-4.8
 permission:
   edit:
     "*": deny

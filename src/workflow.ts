@@ -1,23 +1,19 @@
-import { type PluginInput, tool } from '@opencode-ai/plugin';
-import type { Logger } from './logger.js';
-import type { Step, WorkflowTransitionCoordinator } from './workflow-events.js';
-import { createTransitionPayload } from './workflow-events.js';
+import { type PluginInput, tool } from "@opencode-ai/plugin";
+import type { Logger } from "./logger.js";
+import type { Step, WorkflowTransitionCoordinator } from "./workflow-events.js";
+import { createTransitionPayload } from "./workflow-events.js";
 
-export type { Step } from './workflow-events.js';
+export type { Step } from "./workflow-events.js";
 
-export const NEXT: Record<Step, Step | null> = {
-  specs: 'planner',
-  planner: 'builder',
-  builder: null,
+const PROMPT: Partial<Record<Step, string>> = {
+  planner: "build the plan",
+  builder: "build the first slice",
 };
 
-/**
- * Per-step model configuration.
- */
-export const MODEL: Record<Step, { providerID: string; modelID: string }> = {
-  specs: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
-  planner: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
-  builder: { providerID: 'github-copilot', modelID: 'gpt-5.5' },
+export const NEXT: Record<Step, Step | null> = {
+  specs: "planner",
+  planner: "builder",
+  builder: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -27,20 +23,55 @@ export const MODEL: Record<Step, { providerID: string; modelID: string }> = {
 function formatTransitionOutcome(
   step: Step,
   next: Step,
-  outcome: { status: 'acknowledged' | 'failed' | 'timeout'; targetAgent: string; message?: string },
+  outcome: {
+    status: "acknowledged" | "failed" | "timeout";
+    targetAgent: string;
+    message?: string;
+  },
 ): string {
-  if (outcome.status === 'acknowledged') {
+  if (outcome.status === "acknowledged") {
     return `"${step}" approved. TUI primary agent switched to "${outcome.targetAgent}".`;
   }
-  if (outcome.status === 'failed') {
-    return `[ERROR] "${step}" approved but transition to "${next}" failed: ${outcome.message ?? 'unknown error'}. Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
+  if (outcome.status === "failed") {
+    return `[ERROR] "${step}" approved but transition to "${next}" failed: ${outcome.message ?? "unknown error"}. Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
   }
   // timeout
   return `[ERROR] "${step}" approved but no TUI companion acknowledged the transition to "${next}". Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
 }
 
+// ---------------------------------------------------------------------------
+// Fire-and-forget prompt helper
+// ---------------------------------------------------------------------------
+
+function firePrompt(
+  client: PluginInput["client"],
+  logger: Logger,
+  ctx: { sessionID: string },
+  opts: {
+    agent: string;
+    text: string;
+    messageKey: string;
+  },
+): void {
+  void client.session
+    .promptAsync({
+      throwOnError: true,
+      path: { id: ctx.sessionID },
+      body: {
+        agent: opts.agent,
+        parts: [{ type: "text", text: opts.text }],
+      },
+    })
+    .catch((error) => {
+      logger.error(opts.messageKey, {
+        error: error instanceof Error ? error.message : String(error),
+        sessionID: ctx.sessionID,
+      });
+    });
+}
+
 export function workflowTools(
-  client: PluginInput['client'],
+  client: PluginInput["client"],
   logger: Logger,
   coordinator: WorkflowTransitionCoordinator,
 ) {
@@ -51,23 +82,28 @@ export function workflowTools(
      */
     workflow_advance: tool({
       description: [
-        'Approve the current workflow step and automatically advance to the next one.',
+        "Approve the current workflow step and automatically advance to the next one.",
         "Only call this after the user has explicitly approved the current step's output.",
-        'Do NOT call this speculatively.',
-      ].join(' '),
+        "Do NOT call this speculatively.",
+      ].join(" "),
       args: {
-        approve: tool.schema.boolean().describe(
-          'Set to true only when the user has explicitly approved the current step.'
-        ),
+        approve: tool.schema
+          .boolean()
+          .describe(
+            "Set to true only when the user has explicitly approved the current step.",
+          ),
         current: tool.schema
-          .enum(['specs', 'planner', 'builder'])
-          .describe('The step that is being approved.'),
-        reference: tool.schema
-          .string()
-          .describe('name of the spec file.'),
+          .enum(["specs", "planner", "builder"])
+          .describe("The step that is being approved."),
+        reference: tool.schema.string().describe("name of the spec file."),
       },
       async execute({ approve, current, reference }, ctx) {
-        logger.info('workflow_advance called', { approve, current, reference, sessionID: ctx.sessionID });
+        logger.info("workflow_advance called", {
+          approve,
+          current,
+          reference,
+          sessionID: ctx.sessionID,
+        });
         const step = current as Step;
 
         if (!approve) {
@@ -94,6 +130,14 @@ export function workflowTools(
           return `[ERROR] "${step}" workflow transition event could not be published: ${msg}. Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
         }
 
+        if (outcome.status === "acknowledged" && PROMPT[next] !== undefined) {
+          firePrompt(client, logger, ctx, {
+            agent: next,
+            text: PROMPT[next] + " " + reference,
+            messageKey: "workflow_advance promptAsync failed",
+          });
+        }
+
         return formatTransitionOutcome(step, next, outcome);
       },
     }),
@@ -103,48 +147,38 @@ export function workflowTools(
      * the workflow currently is.
      */
     workflow_status: tool({
-      description: 'Report which workflow step is currently active.',
+      description: "Report which workflow step is currently active.",
       args: {
         current: tool.schema
-          .enum(['specs', 'planner', 'builder'])
-          .describe('The step you believe is currently active.'),
+          .enum(["specs", "planner", "builder"])
+          .describe("The step you believe is currently active."),
       },
       async execute({ current }) {
         const next = NEXT[current as Step];
         return [
           `Active step: ${current}`,
-          next ? `Next step: ${next}` : 'This is the final step.',
-        ].join('\n');
+          next ? `Next step: ${next}` : "This is the final step.",
+        ].join("\n");
       },
     }),
 
     /**
-     * Starts the workflow at the given step by prompting that step's agent
-     * via `session.promptAsync`. Unlike `workflow_advance`, this tool calls
-     * `promptAsync` directly because it is the entry point — there is no
-     * prior step or TUI companion to coordinate with.
+     * Starts the workflow at the given step by prompting that step's agent,
+     * then coordinating the TUI selection from the caller's current agent.
      */
     workflow_start: tool({
-      description: 'Start the workflow.',
+      description: "Start the workflow.",
       args: {
         start: tool.schema
-          .enum(['specs', 'planner', 'builder'])
-          .describe('The step to start from.'),
+          .enum(["specs", "planner", "builder"])
+          .describe("The step to start from."),
       },
       async execute({ start }, ctx) {
         client.session.summarize({ path: { id: ctx.sessionID } });
-        void client.session.promptAsync({
-          path: { id: ctx.sessionID },
-          body: {
-            agent: start,
-            model: MODEL[start],
-            parts: [{ type: 'text', text: `I'll start the ${start} process` }],
-          },
-        }).catch((error) => {
-          logger.error('workflow_start promptAsync failed', {
-            error: error instanceof Error ? error.message : String(error),
-            sessionID: ctx.sessionID,
-          });
+        firePrompt(client, logger, ctx, {
+          agent: start,
+          text: `I'll start the ${start} process`,
+          messageKey: "workflow_start promptAsync failed",
         });
 
         try {
@@ -153,12 +187,15 @@ export function workflowTools(
               nextStep: start,
               sourceAgent: ctx.agent,
               targetAgent: start,
-              reference: '',
+              reference: "",
             },
             ctx.directory,
           );
-          if (outcome.status !== 'acknowledged') {
-            const reason = outcome.status === 'failed' ? outcome.message : 'no companion ack received';
+          if (outcome.status !== "acknowledged") {
+            const reason =
+              outcome.status === "failed"
+                ? outcome.message
+                : "no companion ack received";
             return `[ERROR] Starting the "${start}" step was initiated, but the TUI agent could not be selected: ${reason}. Cycle the TUI agent manually to continue.`;
           }
         } catch (err) {

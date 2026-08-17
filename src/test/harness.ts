@@ -3,12 +3,12 @@ import { createOpencode, type Config, type Event, type Message, type OpencodeCli
 export const WIREMOCK_BASE_URL = 'http://localhost:8080';
 export const WIREMOCK_OPENAI_BASE_URL = `${WIREMOCK_BASE_URL}/v1`;
 export const WIREMOCK_PROVIDER_ID = 'wiremock';
-export const DEFAULT_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'gpt-4o' } as const;
+export const DEFAULT_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'wiremock-default-model' } as const;
 
 // The dev-team workflow_start tool prompts on this provider/model
 // (see src/workflow.ts MODEL map); register it against WireMock too.
-export const WORKFLOW_PROVIDER_ID = 'github-copilot';
-export const WORKFLOW_MODEL_ID = 'gpt-5.5';
+export const WORKFLOW_PROVIDER_ID = 'mock-provider';
+export const WORKFLOW_MODEL_ID = 'mocked-model-id';
 
 export type MessageWithParts = {
   info: Message;
@@ -162,6 +162,10 @@ export function collectEvents(client: OpencodeClient): EventCollector {
 }
 
 export async function startHarness(options: HarnessOptions = {}) {
+  process.env.OPENCODE_DISABLE_PROJECT_CONFIG = '1';
+  console.log(`+++++++++++++++++++++++++++++++++++++++++++++++++Starting Harness...`);
+  process.env.OPENCODE_CONFIG = new URL('./opencode.json', import.meta.url).pathname;
+  console.log(process.env.OPENCODE_CONFIG);
   const { client, server } = await createOpencode({
     port: options.port ?? 0,
     timeout: options.timeout ?? 10_000,

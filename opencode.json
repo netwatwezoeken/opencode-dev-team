@@ -1,0 +1,24 @@
+{
+   "$schema": "https://opencode.ai/config.json",
+   "plugin": [
+      [
+         "./src/index.ts",
+         {
+            "model": {
+               "default": "github-copilot/claude-sonnet-4.6",
+               "specs": "github-copilot/claude-opus-4.8",
+               "builder": "github-copilot/claude-sonnet-4.6",
+               "planner": "github-copilot/claude-opus-4.8",
+               "complexity-review": "claude-haiku-4.5",
+               "plan-review-acceptance": "github-copilot/claude-sonnet-4.6",
+               "plan-review-design": "github-copilot/claude-sonnet-4.6",
+               "plan-review-strategic": "github-copilot/claude-sonnet-4.6",
+               "plan-review-ux": "github-copilot/claude-sonnet-4.6",
+               "refactor-opportunity-review": "github-copilot/claude-haiku-4.5",
+               "software-engineer": "github-copilot/claude-sonnet-4.6",
+               "spec-reviewer": "github-copilot/claude-haiku-4.5"
+            }
+         }
+      ]
+   ]
+}
