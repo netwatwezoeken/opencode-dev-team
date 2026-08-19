@@ -1,27 +1,29 @@
 {
   "mappings": [
     {
-      "name": "workflow_advance_specs_approved_first",
-      "priority": 1,
+      "name": "title generation",
+      "scenarioName": "specs-single",
       "request": {
         "url": "/v1/chat/completions",
         "method": "POST",
         "bodyPatterns": [
           {
             "matchesJsonPath": {
-              "expression": "$.messages[-1:][?(@.role == 'user')].content",
-              "contains": "advance-specs-integration-trigger"
+              "expression": "$.messages[-2:-1][?(@.role == 'user')].content",
+              "contains": "Generate a title for this conversation:"
             }
           }
         ]
       },
       "response": {
         "status": 200,
-        "bodyFileName": "workflow_advance-specs-approved.json",
+        "bodyFileName": "title.json",
         "headers": {
           "Content-Type": "text/event-stream; charset=utf-8"
         }
-      }
+      },
+      "persistent": true,
+      "insertionIndex": 2
     }
   ]
 }

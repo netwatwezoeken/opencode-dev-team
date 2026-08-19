@@ -1,13 +1,19 @@
 {
   "mappings": [
     {
-      "name": "v1_chat_completions_single_first",
-      "scenarioName": "specs-single",
-      "requiredScenarioState": "Started",
-      "newScenarioState": "SpecsStarted",
+      "name": "workflow_start-specs",
+      "priority": 1,
       "request": {
         "url": "/v1/chat/completions",
-        "method": "POST"
+        "method": "POST",
+        "bodyPatterns": [
+        {
+          "matchesJsonPath": {
+            "expression": "$.messages[-1:][?(@.role == 'user')].content",
+            "contains": "step of a specs → plan → build workflow by calling"
+          }
+        }
+      ]
       },
       "response": {
         "status": 200,
@@ -15,14 +21,11 @@
         "headers": {
           "Content-Type": "text/event-stream; charset=utf-8"
         }
-      },
-      "persistent": true,
-      "insertionIndex": 2
+      }
     },
     {
       "name": "v1_chat_completions_single_after",
-      "scenarioName": "specs-single",
-      "requiredScenarioState": "SpecsStarted",
+      "priority": 999,
       "request": {
         "url": "/v1/chat/completions",
         "method": "POST"
@@ -33,9 +36,7 @@
         "headers": {
           "Content-Type": "text/event-stream; charset=utf-8"
         }
-      },
-      "persistent": true,
-      "insertionIndex": 2
+      }
     }
   ]
 }

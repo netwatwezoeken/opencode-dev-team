@@ -2,14 +2,17 @@
   "mappings": [
     {
       "name": "workflow_advance_builder_final_first",
-      "scenarioName": "workflow-advance-builder",
-      "requiredScenarioState": "Started",
-      "newScenarioState": "BuilderAdvanceRequested",
+      "priority": 1,
       "request": {
         "url": "/v1/chat/completions",
         "method": "POST",
         "bodyPatterns": [
-          { "contains": "advance-builder-integration-trigger" }
+          {
+            "matchesJsonPath": {
+              "expression": "$.messages[-1:][?(@.role == 'user')].content",
+              "contains": "advance-builder-integration-trigger"
+            }
+          }
         ]
       },
       "response": {
@@ -18,30 +21,7 @@
         "headers": {
           "Content-Type": "text/event-stream; charset=utf-8"
         }
-      },
-      "persistent": true,
-      "insertionIndex": 4
-    },
-    {
-      "name": "workflow_advance_builder_final_after",
-      "scenarioName": "workflow-advance-builder",
-      "requiredScenarioState": "BuilderAdvanceRequested",
-      "request": {
-        "url": "/v1/chat/completions",
-        "method": "POST",
-        "bodyPatterns": [
-          { "contains": "advance-builder-integration-trigger" }
-        ]
-      },
-      "response": {
-        "status": 200,
-        "bodyFileName": "done.json",
-        "headers": {
-          "Content-Type": "text/event-stream; charset=utf-8"
-        }
-      },
-      "persistent": true,
-      "insertionIndex": 4
+      }
     }
   ]
 }

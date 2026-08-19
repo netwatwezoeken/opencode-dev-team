@@ -2,13 +2,9 @@ import { createOpencode, type Config, type Event, type Message, type OpencodeCli
 
 export const WIREMOCK_BASE_URL = 'http://localhost:8080';
 export const WIREMOCK_OPENAI_BASE_URL = `${WIREMOCK_BASE_URL}/v1`;
-export const WIREMOCK_PROVIDER_ID = 'wiremock';
-export const DEFAULT_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'wiremock-default-model' } as const;
-
-// The dev-team workflow_start tool prompts on this provider/model
-// (see src/workflow.ts MODEL map); register it against WireMock too.
-export const WORKFLOW_PROVIDER_ID = 'mock-provider';
-export const WORKFLOW_MODEL_ID = 'mocked-model-id';
+export const WIREMOCK_PROVIDER_ID = 'mock-provider';
+export const DEFAULT_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'default-model' } as const;
+export const SPECS_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'mocked-model-id' } as const;
 
 export type MessageWithParts = {
   info: Message;
@@ -48,29 +44,22 @@ export type EventCollector = {
   stop(): void;
 };
 
-export function wiremockOpenAIConfig(overrides: Config = {}): Config {
-  const providerOverride = overrides.provider?.[WIREMOCK_PROVIDER_ID] ?? {};
+export function wiremockOpenAIConfig(): Config {
   const wiremockOptions = {
     apiKey: 'wiremock-test-key',
     baseURL: WIREMOCK_OPENAI_BASE_URL,
   };
   return {
-    enabled_providers: [WIREMOCK_PROVIDER_ID, WORKFLOW_PROVIDER_ID],
-    model: `${DEFAULT_MODEL.providerID}/${DEFAULT_MODEL.modelID}`,
-    small_model: `${DEFAULT_MODEL.providerID}/${DEFAULT_MODEL.modelID}`,
-    ...overrides,
+    enabled_providers: [WIREMOCK_PROVIDER_ID],
     provider: {
-      ...overrides.provider,
       // A custom "openai-compatible" provider talks to WireMock over
       // POST /v1/chat/completions (via @ai-sdk/openai-compatible) — unlike the
       // native "openai" provider, which calls the Responses API (/v1/responses).
       [WIREMOCK_PROVIDER_ID]: {
         name: 'WireMock (OpenAI-compatible)',
         npm: '@ai-sdk/openai-compatible',
-        ...providerOverride,
         options: {
           ...wiremockOptions,
-          ...(providerOverride.options ?? {}),
         },
         models: {
           [DEFAULT_MODEL.modelID]: {
@@ -78,25 +67,13 @@ export function wiremockOpenAIConfig(overrides: Config = {}): Config {
             tool_call: true,
             limit: { context: 128_000, output: 16_384 },
           },
-          ...(providerOverride.models ?? {}),
-        },
-      },
-      // The dev-team workflow_start tool prompts on github-copilot/gpt-5.5
-      // (see src/workflow.ts MODEL map). Register that provider/model against
-      // WireMock too, otherwise the /specs command fails with
-      // ProviderModelNotFoundError: Model not found: github-copilot/gpt-5.5.
-      [WORKFLOW_PROVIDER_ID]: {
-        name: 'WireMock (workflow models)',
-        npm: '@ai-sdk/openai-compatible',
-        options: { ...wiremockOptions },
-        models: {
-          [WORKFLOW_MODEL_ID]: {
-            name: WORKFLOW_MODEL_ID,
+          [SPECS_MODEL.modelID]: {
+            name: SPECS_MODEL.modelID,
             tool_call: true,
             limit: { context: 128_000, output: 16_384 },
-          },
+          }
         },
-      },
+      }
     },
   };
 }
@@ -169,7 +146,7 @@ export async function startHarness(options: HarnessOptions = {}) {
   const { client, server } = await createOpencode({
     port: options.port ?? 0,
     timeout: options.timeout ?? 10_000,
-    config: wiremockOpenAIConfig(options.config),
+    config: wiremockOpenAIConfig(),
   });
   const events = collectEvents(client);
 
