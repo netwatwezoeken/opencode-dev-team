@@ -185,7 +185,7 @@ describe("handleTransitionCommand", () => {
       sessionID: "new-session",
     });
     expect(deps.toast).toHaveBeenCalledWith(
-      "[OK] Workflow step: planner started in clean session new-session",
+      "Workflow: planner started in a clean session",
       "info",
     );
   });

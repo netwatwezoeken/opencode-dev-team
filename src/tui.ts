@@ -244,7 +244,7 @@ export async function handleTransitionCommand(
     `${WORKFLOW_TRANSITION_ACKNOWLEDGED}:${JSON.stringify(acknowledged)}`,
   );
   deps.toast(
-    `[OK] Workflow step: ${payload.nextStep} started in clean session ${session.id}`,
+    `Workflow: ${payload.nextStep} started in a clean session`,
     "info",
   );
 }
