@@ -11,22 +11,22 @@ refactors the `no-refactor` operator declined at Phase 0, and the mode — not
 the keystroke — is the final authority. Only `refactor-mode: refactor-allowed`
 permits Phase 7 to execute.
 
-**Seam-only production code changes.** `/build` in Phase 7 accepts **seam
+**Seam-only production code changes.** `/builder` in Phase 7 accepts **seam
 introductions only** — interface extractions, dependency injection points,
 virtual method promotions, factory wrapping. Any change beyond a seam is
 rejected. Behavior modifications, refactors that alter semantics, and
 opportunistic clean-ups are all out of scope.
 
-**Existing tests are immutable.** Phase 7 **may not modify or remove existing tests** — `/build` rejects deletions and edits to any file under the stack's test directory that existed before Phase 7 started. The pre-Phase-7 suite must stay green throughout; a red pre-Phase-7 test halts the phase.
+**Existing tests are immutable.** Phase 7 **may not modify or remove existing tests** — `/builder` rejects deletions and edits to any file under the stack's test directory that existed before Phase 7 started. The pre-Phase-7 suite must stay green throughout; a red pre-Phase-7 test halts the phase.
 
 **Phase-5 precondition-check.** Each Phase-7 Story is paired with the
 corresponding Phase-5 baseline Story that could not close under no-refactor.
-Before `/build` runs a Phase-7 Story, `/test-improve` **verifies the paired
+Before `/builder` runs a Phase-7 Story, `/test-improve` **verifies the paired
 Phase-5 Story is closed and green**. A missing or failing Phase-5 baseline
 halts that Story until the operator resolves it.
 
 **Phase 5's parallel-dispatch warning (issue #1571) applies equally here** —
-Phase 7 runs the same per-Story `/build` loop against the same shared
+Phase 7 runs the same per-Story `/builder` loop against the same shared
 working tree, so **never dispatch multiple Phase-7 Stories' build loops
 concurrently without `isolation: "worktree"` on every dispatch**; see
 `phase-5-improve.md` for why the race is unsafe.

@@ -58,7 +58,7 @@ Three reflexes that fire at the moment code is written — not just at review ti
 ## Skills
 
 - [Quality Gate Pipeline](.opencode/skills/quality-gate-pipeline/SKILL.md) - invoke before delivery (Phase 1: self-validation), before completion claims (Phase 2: verification evidence), and during rework (Phase 3: review-correction loop)
-- [Test-Driven Development](.opencode/skills/test-driven-development/SKILL.md) - advisory RED-GREEN-REFACTOR methodology reference; invoke only on explicit request or for after-the-fact discipline audits. `/build`'s single cadence is Code-First Small Batches — implement one behavior, write its test, refactor on every green; the refactor step is mandatory
+- [Test-Driven Development](.opencode/skills/test-driven-development/SKILL.md) - advisory RED-GREEN-REFACTOR methodology reference; invoke only on explicit request or for after-the-fact discipline audits. `/builder`'s single cadence is Code-First Small Batches — implement one behavior, write its test, refactor on every green; the refactor step is mandatory
 - [Systematic Debugging](.opencode/skills/systematic-debugging/SKILL.md) - invoke when any test fails or unexpected behavior occurs; no guess-and-fix. Its Phase 4 is a hard gate for every defect fix — reproduce the bug with a failing test before writing fix code — regardless of the advisory-only status of Test-Driven Development above
 - [Hexagonal Architecture](.opencode/skills/hexagonal-architecture/SKILL.md) - invoke when structuring new services or modules with port/adapter separation
 - [Domain-Driven Design](.opencode/skills/domain-driven-design/SKILL.md) - invoke when modeling business domains, defining aggregates, or mapping bounded contexts

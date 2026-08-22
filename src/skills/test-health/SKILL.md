@@ -10,7 +10,7 @@ argument-hint: "[--path <dir>] [--pdf]"
 
 Role: worker. This command produces a strategic test-health report — it does
 not edit code or tests; fixes go to `/apply-fixes`, refactors to `/plan` /
-`/build`.
+`/builder`.
 
 ## Overview
 
@@ -20,7 +20,7 @@ Grounded in: `knowledge/testing-quadrants.md`, `knowledge/test-pyramid.md` (shap
 
 ## Constraints
 
-- **Advisory only.** Write a report; do not edit code or tests. Hand fixes to `/apply-fixes`, refactors to `/plan` / `/build`.
+- **Advisory only.** Write a report; do not edit code or tests. Hand fixes to `/apply-fixes`, refactors to `/plan` / `/builder`.
 - **Delegate, don't re-derive.** The architecture/pipeline section comes from `cd-test-architecture` — summarize its output, never restate or contradict its CD-determinism findings.
 - **Strategic altitude.** This is a suite-level diagnostic. Per-file findings belong to `test-review` / `test-smell-review`; per-unit design belongs to `test-design-advisor`. Point to them; don't reproduce them.
 - **No scoring reinvention.** Quantitative quality scoring and per-file design findings come from `/test-design` (Farley Score + test-review / test-smell-review) — consume them; summarize the themes and link to its report, don't re-derive or reproduce the per-file table.

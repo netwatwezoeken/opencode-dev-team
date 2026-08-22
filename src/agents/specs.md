@@ -33,7 +33,7 @@ this feature:
 
 - If no spec file exists: proceed directly to Step 1.
 - If a spec file exists: read its opening lines and check for a `<!-- spec-version: -->` comment or a `**Format:**` header field.
-  - If the marker is absent or predates the current skill version (see frontmatter `version:`): surface this to the user — *"An existing spec was found but appears to use an older format. Regenerate from scratch, or confirm you want to update in place?"* — and wait for explicit direction before proceeding.
+  - If the marker is absent or predates the current skill version (see frontmatter `version:`): surface this to the user — _"An existing spec was found but appears to use an older format. Regenerate from scratch, or confirm you want to update in place?"_ — and wait for explicit direction before proceeding.
   - If the marker matches the current version: proceed to Step 1 with the existing file as base.
 
 This prevents silently overwriting a current spec and catches format drift before
@@ -53,11 +53,11 @@ Produce three specification artifacts collaboratively with the human before any 
 
 ## Artifacts
 
-| Artifact | Purpose | Format |
-|---|---|---|
-| Intent Description | What the change achieves and why | Plain language, 1–3 paragraphs |
-| Architecture Specification | Where the change fits and what constraints apply | Structured notes: components, interfaces, dependencies, constraints |
-| Acceptance Criteria | Observable outcomes and quality thresholds that define "done" | Measurable criteria with pass/fail conditions |
+| Artifact                   | Purpose                                                       | Format                                                              |
+| -------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Intent Description         | What the change achieves and why                              | Plain language, 1–3 paragraphs                                      |
+| Architecture Specification | Where the change fits and what constraints apply              | Structured notes: components, interfaces, dependencies, constraints |
+| Acceptance Criteria        | Observable outcomes and quality thresholds that define "done" | Measurable criteria with pass/fail conditions                       |
 
 Observable user behavior is captured as Gherkin in `/planner`, one scenario set per slice. The spec's job is to make that authoring unambiguous, not to pre-write it.
 
@@ -74,12 +74,12 @@ Repeat up to **2 iterations** before escalating.
 
 ### Critique categories
 
-| Category | Description |
-|---|---|
-| Gaps | Missing acceptance criteria, unstated assumptions, undefined behavior |
-| Ambiguities | Statements two implementers would interpret differently |
-| Conflicts | Contradictions between artifacts or with existing system behavior |
-| Scope violations | Spec bundles unrelated features that belong in separate specs |
+| Category         | Description                                                           |
+| ---------------- | --------------------------------------------------------------------- |
+| Gaps             | Missing acceptance criteria, unstated assumptions, undefined behavior |
+| Ambiguities      | Statements two implementers would interpret differently               |
+| Conflicts        | Contradictions between artifacts or with existing system behavior     |
+| Scope violations | Spec bundles unrelated features that belong in separate specs         |
 
 ## Ambiguity Resolution Protocol
 
@@ -91,10 +91,10 @@ For each gap or ambiguity:
 
 **Step B — Classify the finding.**
 
-| Class | Meaning | Action |
-|-------|---------|--------|
-| `inferable` | A reasonable developer, given the codebase and domain, would make the same choice | Document the inference and its rationale; proceed |
-| `requires-stakeholder-input` | The decision depends on product or business intent not evident from context; two reasonable developers would choose differently | **Block — ask the human before proceeding** |
+| Class                        | Meaning                                                                                                                         | Action                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `inferable`                  | A reasonable developer, given the codebase and domain, would make the same choice                                               | Document the inference and its rationale; proceed |
+| `requires-stakeholder-input` | The decision depends on product or business intent not evident from context; two reasonable developers would choose differently | **Block — ask the human before proceeding**       |
 
 **Step C — Resolve `requires-stakeholder-input` items.** Collect all such items and present them as a single batch to the human before writing acceptance criteria:
 
@@ -166,42 +166,47 @@ After the gate passes, write all three artifacts plus the verdict to a markdown 
 # Spec: <Feature Name>
 
 ## Intent Description
+
 <intent artifact>
 
 ## Architecture Specification
+
 <architecture artifact>
 
 ## Acceptance Criteria
+
 <acceptance criteria artifact>
 
 ## Ambiguity Log
 
 All gap and ambiguity findings from the Ambiguity Resolution Protocol, with their classifications and rationale.
 
-| Decision | Classification | Resolved By | Rationale / Answer |
-|----------|---------------|-------------|-------------------|
+| Decision        | Classification                             | Resolved By       | Rationale / Answer            |
+| --------------- | ------------------------------------------ | ----------------- | ----------------------------- |
 | <decision text> | `inferable` / `requires-stakeholder-input` | inference / human | <rationale or human's answer> |
 
 ## Consistency Gate
-- [x/  ] Intent is unambiguous
-- [x/  ] Every behavior/goal maps to an acceptance criterion
-- [x/  ] Architecture constrains without over-engineering
-- [x/  ] Terminology consistent across artifacts
-- [x/  ] No contradictions between artifacts
-- [x/  ] Every gap/ambiguity finding is logged — inferable with rationale or resolved by human
+
+- [x/ ] Intent is unambiguous
+- [x/ ] Every behavior/goal maps to an acceptance criterion
+- [x/ ] Architecture constrains without over-engineering
+- [x/ ] Terminology consistent across artifacts
+- [x/ ] No contradictions between artifacts
+- [x/ ] Every gap/ambiguity finding is logged — inferable with rationale or resolved by human
 ```
 
 1. **Print** the file path to chat so the user can find it.
 
 ### Trigger next step
 
-After persisting, automatically invoke `/planner` with the feature description. 
-
 When the user has **explicitly approved** the spec, call `workflow_advance` with:
+
 - `approve: true`
 - `current: "specs"`
 - `reference: "<path and filname of created spec>"`
 
 Do NOT call `workflow_advance` until the user has confirmed the spec is correct.
 
-"Plan" is the next step is discovers the spec artifacts, decomposes the feature into vertical slices, and authors the Gherkin scenarios for each slice. Do not ask first — the approved spec is the trigger.
+The workflow handoff opens a clean session with `planner` selected and a title
+derived from the spec path. It does not submit a command or prompt in that new
+session.

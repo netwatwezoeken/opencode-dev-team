@@ -23,15 +23,14 @@ concerns compose independently.
 Only a **top-level human invocation** writes to `.dev-team-reports/`:
 
 - `/review-agent <agent>` writes `.dev-team-reports/<agent>.md` — **unless**
-  `--internal` is passed (the orchestrator-internal dispatch signal; `/build`
+  `--internal` is passed (the orchestrator-internal dispatch signal; `/builder`
   is the only sanctioned caller today).
 - `/code-review` (interactive, no `--json`) writes
   `.dev-team-reports/code-review.md` — **unless** `--internal` is passed (the
-  sanctioned callers today are `/build`'s Step 6 backstop review and
+  sanctioned callers today are `/builder`'s Step 6 backstop review and
   `/test-improve`'s Phase 5/7 end-of-phase review loop — see below for
   `/ship`'s Step 5, a deliberate, documented exception that keeps writing
-  the report) or `--json` is passed (CI/`/pr` callers — `--json` never
-  writes a file, full stop).
+  the report) or `--json` is passed.
 - `/triage` writes `.dev-team-reports/triage/<slug>.md` unconditionally — it
   has no orchestrator-internal caller today.
 - `/session-review` writes `.dev-team-reports/session-review-<date>.md` (or
@@ -46,20 +45,20 @@ or output format.
 
 `/ship`'s Step 5 ("Review") dispatches `/code-review` with neither
 `--internal` nor `--json` — so it writes `.dev-team-reports/code-review.md`
-by default, unlike `/build`'s Step 6 and `/test-improve`'s Phase 5/7 review
+by default, unlike `/builder`'s Step 6 and `/test-improve`'s Phase 5/7 review
 loop above. This is a **deliberate, stated exception** to the "only a
 top-level human invocation writes" rule, not an unaudited gap (issue #982):
 
 `/ship` is itself `user-invocable: true` and is only ever entered by a
-human directly typing `/ship` — but so is `/build`, whose own internal
+human directly typing `/ship` — but so is `/builder`, whose own internal
 Step 6 dispatch is suppressed, so being human-typed at the top isn't by
 itself what earns the exception. The stronger distinguishing factor is
-**frequency and scope, not surfacing**: `/build`'s Step 7.5 evidence bundle
+**frequency and scope, not surfacing**: `/builder`'s Step 7.5 evidence bundle
 does surface the Step 6 `/code-review` *status* back to the human at
 completion (a pass/fail line, not the artifact itself), and `/test-improve`
 similarly surfaces its review outcome in each phase's evidence file — so
 "no human-facing surfacing at all" is not the real dividing line. What
-actually differs: `/build`'s Step 6 and `/test-improve`'s per-phase loop
+actually differs: `/builder`'s Step 6 and `/test-improve`'s per-phase loop
 each run **multiple times across a session** (once per build, once per
 `/test-improve` phase) against a **diff-scoped** slice of the total change —
 a `.dev-team-reports/code-review.md` write from either would represent only
@@ -69,7 +68,7 @@ shipped feature, over the **full accumulated diff** — the one point in the
 pipeline where a durable, complete review artifact is both meaningful and
 non-redundant. Reinforcing this: `/code-review`'s own step-6 "exception (b)"
 (which skips the interactive fix-or-report prompt for callers "running
-inside `/build` or `/pr`") does not name `/ship` either — `/ship`'s dispatch
+inside `/builder`") does not name `/ship` either — `/ship`'s dispatch
 is genuinely interactive today, consistent with a human being present for
 this one-time gate rather than an orchestrator-internal backstop.
 

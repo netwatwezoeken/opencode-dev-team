@@ -64,7 +64,7 @@ When authoring each slice's Gherkin, cover:
 
 Keep scenarios implementation-independent (no databases, selectors, or internal data structures in step text) and deterministic. Every acceptance criterion from the spec must be covered by at least one scenario across the slices. Each TDD step traces back to one or more scenarios in its slice.
 
-**Filter `LOW_VALUE` findings out of the work streams.** A gap classified `LOW_VALUE` by `/specs` or `/test-health` (no branching logic, no observable outcome, coverage already provided by a higher-layer test) never becomes a slice or a TDD step. List such findings in a `## Skipped (low value)` section with their one-line rationale so the decision is visible — they document why the work was *not* planned, not deferred work to revisit. **The plan gate rejects any slice or step classified `LOW_VALUE`**: if a `LOW_VALUE` finding has leaked into a work stream, move it to the Skipped section before the human gate.
+**Filter `LOW_VALUE` findings out of the work streams.** A gap classified `LOW_VALUE` by `/specs` or `/test-health` (no branching logic, no observable outcome, coverage already provided by a higher-layer test) never becomes a slice or a TDD step. List such findings in a `## Skipped (low value)` section with their one-line rationale so the decision is visible — they document why the work was _not_ planned, not deferred work to revisit. **The plan gate rejects any slice or step classified `LOW_VALUE`**: if a `LOW_VALUE` finding has leaked into a work stream, move it to the Skipped section before the human gate.
 
 ### 3. Create the plan
 
@@ -93,11 +93,11 @@ Before presenting to the user, dispatch the plan review personas in parallel as 
 
 Derive a **plan tier** from objective signals already on hand — the same `trivial | standard | complex` vocabulary `/builder` uses for per-step review depth, so the concept is consistent across the pipeline. Inputs: the slices, the file count, the per-step Complexity ratings, and whether the plan takes a stance on any high-reversal-cost axis in `.opencode/knowledge/decision-defaults.md`.
 
-| Tier | Signals | Reviewers |
-| ------ | --------- | ----------- |
-| `trivial` | 1 slice, ≤ 2 files, no `complex` step, touches no high-reversal-cost decision axis | **Acceptance Test Critic only** (1) |
-| `standard` | anything between — e.g. a single slice with a few files, or a small multi-slice plan within existing patterns | **Acceptance Test Critic + Design & Architecture Critic**, plus **UX Critic** if the plan has a user-facing/UI surface |
-| `complex` | > 1 wave, ≥ 4 slices, any `complex` step, a security-sensitive/cross-cutting change, or a **non-default** stance on a high-reversal-cost decision axis, or the axis was **contested** at the `/ship` gate | **all 5** |
+| Tier       | Signals                                                                                                                                                                                                   | Reviewers                                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `trivial`  | 1 slice, ≤ 2 files, no `complex` step, touches no high-reversal-cost decision axis                                                                                                                        | **Acceptance Test Critic only** (1)                                                                                    |
+| `standard` | anything between — e.g. a single slice with a few files, or a small multi-slice plan within existing patterns                                                                                             | **Acceptance Test Critic + Design & Architecture Critic**, plus **UX Critic** if the plan has a user-facing/UI surface |
+| `complex`  | > 1 wave, ≥ 4 slices, any `complex` step, a security-sensitive/cross-cutting change, or a **non-default** stance on a high-reversal-cost decision axis, or the axis was **contested** at the `/ship` gate | **all 5**                                                                                                              |
 
 Every `/ship`-driven plan states a stance on the axes in `.opencode/knowledge/decision-defaults.md` — merely restating the default is not, by itself, a `complex` signal (treating it as one would defeat the tier system's own review-scaling goal). "Contested" means a recorded objection to the stance, e.g. a note in the plan's `## Risks & Open Questions` section — not an unrecorded verbal disagreement.
 
@@ -109,12 +109,12 @@ When in doubt, classify up (standard rather than trivial, complex rather than st
 
 The personas are subagents, each have their own topic
 
-| Reviewer | subagent | Effort | Focus |
-| ---------- | ---------- | -------- | ------- |
-| Acceptance Test Critic | `plan-review-acceptance` | `medium` | Per-slice Gherkin quality (determinism, isolation, implementation-independence), scenario gaps, error paths, criteria coverage, TDD traceability |
-| Design & Architecture Critic | `plan-review-design` | `medium` | Coupling, abstractions, structural risks, pattern adherence |
-| UX Critic | `plan-review-ux` | `medium` | User journey, error UX, cognitive load, accessibility |
-| Strategic Critic | `plan-review-strategic` | `medium` | Problem fit, scope, slice boundaries, risk, opportunity cost |
+| Reviewer                     | subagent                 | Effort   | Focus                                                                                                                                            |
+| ---------------------------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Acceptance Test Critic       | `plan-review-acceptance` | `medium` | Per-slice Gherkin quality (determinism, isolation, implementation-independence), scenario gaps, error paths, criteria coverage, TDD traceability |
+| Design & Architecture Critic | `plan-review-design`     | `medium` | Coupling, abstractions, structural risks, pattern adherence                                                                                      |
+| UX Critic                    | `plan-review-ux`         | `medium` | User journey, error UX, cognitive load, accessibility                                                                                            |
+| Strategic Critic             | `plan-review-strategic`  | `medium` | Problem fit, scope, slice boundaries, risk, opportunity cost                                                                                     |
 
 Call a subagent using `@<subagentname>`
 
@@ -130,10 +130,10 @@ Pass each reviewer the full plan content. Each returns a structured verdict (`ap
 
 **Surface any `scope_mismatches` (#865)** alongside the review summary, same visibility as `collisions` — never blocking. Unreconciled on approval → append it to `## Risks & Open Questions`.
 
-**First determine interactivity.** The run is **non-interactive** when any of these hold: `--yes` was passed, `DEV_TEAM_AUTO_APPROVE=1` is set in the environment, or stdin is not a usable TTY (`test -t 0` is false — the headless/CI/automation case). Otherwise it is **interactive**. This is the same non-interactive principle the GitHub-issue prompt below already follows; the approval gate now follows it too, so a headless `/planner`→`/builder` run never hangs waiting for input.
+**First determine interactivity.** The run is **non-interactive** when any of these hold: `--yes` was passed is set in the environment, or stdin is not a usable TTY (`test -t 0` is false — the headless/CI/automation case). Otherwise it is **interactive**. This is the same non-interactive principle the GitHub-issue prompt below already follows; the approval gate now follows it too, so a headless `/planner`→`/builder` run never hangs waiting for input.
 
 - **Interactive** (unchanged from prior behavior) → Display the plan and the review summary. Ask: "Approve this plan to begin implementation, or suggest changes?" Mark the plan status as `approved` once the user confirms. If the user requests changes, update the plan and re-present. This is the Phase 2→3 gate: append an `approval` entry to `metrics/config-changelog.jsonl` per the [human-oversight-protocol § Audit trail](../skills/human-oversight-protocol/SKILL.md#audit-trail) schema — `proposed` names the plan (e.g. "Approve plan for <task>"), `evidence_shown` points at the plan file (and any spec artifact), `risks_surfaced` lists the plan's `## Risks & Open Questions` items (`[]` if none).
-- **Non-interactive** → do **not** prompt or block. Auto-approve: set `**Status**: approved` and append an explicit audit record to the plan so the bypass is **never silent** — add an `## Approval` section reading: `Auto-approved (non-interactive) at <date> — no human review gate. Trigger: <--yes | DEV_TEAM_AUTO_APPROVE=1 | no TTY>.` Then continue, appending the same three-field `metrics/config-changelog.jsonl` entry; `description` states the bypass trigger.
+- **Non-interactive** → do **not** prompt or block. Auto-approve: set `**Status**: approved` and append an explicit audit record to the plan so the bypass is **never silent** — add an `## Approval` section reading: `Auto-approved (non-interactive) at <date> — no human review gate. Trigger: <--yes | no TTY>.` Then continue, appending the same three-field `metrics/config-changelog.jsonl` entry; `description` states the bypass trigger.
 
 #### Post-approval: persist the Gherkin (`.feature` export)
 
@@ -147,6 +147,16 @@ A non-zero exit is a failure: report it with the script's stderr — never claim
 success on a failed export. `plan-file-only` decisions skip cleanly (the
 script no-ops with a note).
 
-### Auto-trigger /build
+### Trigger builder
 
-After approval and persisting, automatically invoke `/builder` with the feature description. The build command will implement each slice one at a time. Do not ask first — the approved plan is the trigger.
+When the user has **explicitly approved** the plan and Gherkin persistence has
+finished, call `workflow_advance` with:
+
+- `approve: true`
+- `current: "planner"`
+- `reference: "<path and filename of the approved plan>"`
+
+Do not call `workflow_advance` until approval and persistence are complete. The
+workflow handoff opens a clean session with `builder` selected and a title
+derived from the plan path. It does not submit a command or prompt in that new
+session.

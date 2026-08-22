@@ -31,7 +31,7 @@ whole-repo score by splicing the freshly-measured changed files over the
 **persisted** Phase-2 baseline (`baseline-mutation.json`), and reports any
 module it could not measure (OOM/timeout) as **held at baseline** rather than
 omitting it. No extra flag is threaded through the delegation above — the
-worker resolves the branch base itself using the same idiom as `/build`'s
+worker resolves the branch base itself using the same idiom as `/builder`'s
 Farley-Score step. The whole-repo splice relies on the
 `.dev-team-reports/test-improve/<slug>/data/baseline-mutation.json` that
 Phase 2 persisted directly and unconditionally (see

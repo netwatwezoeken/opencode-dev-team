@@ -30,7 +30,7 @@ fields natively before dispatch, per Model/Effort Resolution in
 
 1. **Advisory only.** Aggregate findings and recommendations. Do not edit
    production code or write test files. Hand actionable fixes to `/apply-fixes`
-   or `/build`.
+   or `/builder`.
 2. **Dispatch in parallel.** `test-review` and `test-smell-review` are
    independent — spawn them in one batch for context isolation; each returns
    structured JSON, not file dumps.

@@ -51,7 +51,7 @@ Show the recommendation and let the operator override. The three modes:
   files written."*). **Write no files.**
 - **`xunit-with-annotations`** — derive scenarios and write `.feature` files, but
   do **NOT** wire a BDD runner or install any framework. The files are
-  documentation that `/build` cites in test method names and leading comments.
+  documentation that `/builder` cites in test method names and leading comments.
 - **`bdd-runner`** — derive scenarios, write `.feature` files, wire the
   language-appropriate BDD framework (Step 4), and generate pending step
   definition stubs.
@@ -252,7 +252,7 @@ that pass silently.
 **Merge, never overwrite (issue #1421).** Step-definition stubs are merged
 into the existing file the same way Step 5 merges `.feature` scenarios —
 never a raw `Write`, which would silently discard any step a human (or
-`/build`) has already implemented. For each surface's step-definition file,
+`/builder`) has already implemented. For each surface's step-definition file,
 write the newly-derived stub text (using the pending-stub form from the
 table above) to a scratch candidates file, then invoke
 `gherkin_stub_merge.py merge`:
@@ -508,13 +508,13 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gherkin_stub_gate.py" --dir <step-definit
   run when this statement applies — the not-done headline governs the whole
   report's tone, not just its own line.
   - **Proactive hand-off (standalone invocations only).** After printing the
-    statement, ask the operator whether to continue into `/build` now,
+    statement, ask the operator whether to continue into `/builder` now,
     rather than only printing the recommendation and moving on. When
     gherkin-derive runs as a `/test-improve` Phase 3 sub-step, **do not ask**
     — Phase 3's own human gate, Phase 4's triage, and Phase 5's fill-in loop
     already own that decision (see below).
   - **Non-interactive fallback.** When no interactive response is possible
-    (headless/CI invocation), print the statement and the `/build`
+    (headless/CI invocation), print the statement and the `/builder`
     recommendation in full and never ask the question — it is best-effort
     and never blocks the run.
   - **Never fills in an already-pending stub itself.** Reporting this state
@@ -523,7 +523,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gherkin_stub_gate.py" --dir <step-definit
     scaffolding *new* pending stubs for newly-discovered scenarios, which
     legitimately changes the pending-stub count on an ordinary re-run.
 - **Zero pending stubs → print `bdd-runner binding complete — 0 pending step
-  definitions`**, with no recommendation and no continue-into-`/build`
+  definitions`**, with no recommendation and no continue-into-`/builder`
   question.
 - **The gate exits 2 when it did not run** (no step-definition files were
   found under `--dir` — most often a mistyped or mis-probed directory, not
@@ -536,7 +536,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/gherkin_stub_gate.py" --dir <step-definit
 **Consistency with `/test-improve` Phase 5's own gate.** Phase 3's headline
 statement and Phase 5's later hard block (`../test-improve/SKILL.md`'s Phase 5
 section) describe the *same* pending-stub state at two different
-checkpoints, not two different requirements — both name `/build`
+checkpoints, not two different requirements — both name `/builder`
 (Phase 5's own per-Story build loop) as the remediation, so an operator never
 receives two conflicting instructions for the same fact.
 

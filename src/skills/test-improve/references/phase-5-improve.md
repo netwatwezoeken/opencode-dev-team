@@ -1,7 +1,7 @@
 Iterate the approved Phase-5 Story set. For **each Story**:
 
 **Never dispatch multiple Stories' build loops in parallel against one shared
-working tree (issue #1571).** Each Story's step 1 runs `/build`, which
+working tree (issue #1571).** Each Story's step 1 runs `/builder`, which
 `git add`/`git commit`s as it goes — two or more concurrent dispatches
 against the same checkout race on the index and working files, and that race
 is real: it has produced observed data loss (reverted test files, deleted
@@ -12,7 +12,7 @@ concurrently via the `Agent` tool — dispatch every one of them with
 `isolation: "worktree"` so each gets its own git working tree; disjoint file
 assignment alone is not a substitute for worktree isolation here.
 
-1. **Build** — invoke `/build <story-id>`. `/build` inherits the **no-refactor**
+1. **Build** — invoke `/build <story-id>`. `/builder` inherits the **no-refactor**
    mode from Phase 0: production-code changes are **rejected**. A Story that
    would require a production-code change is surfaced as a REFACTOR_REQUIRED
    deferral candidate and re-classified for Phase 6.
@@ -23,7 +23,7 @@ assignment alone is not a substitute for worktree isolation here.
    definitions are filled in against the parser wired at Phase 3. In `none`
    mode, the test is authored idiomatically for the stack without
    feature-file citations.
-3. **Coverage delta** — after `/build` closes the Story, invoke
+3. **Coverage delta** — after `/builder` closes the Story, invoke
    `/coverage-delta --workflow test-improve --story <id>`. The delta is
    appended to `.dev-team-reports/test-improve/<slug>/data/coverage-history.json`.
 4. **Coverage-delta steering check (issue #1790).** After the delta is
@@ -56,7 +56,7 @@ assignment alone is not a substitute for worktree isolation here.
      in mutation-kill's `[c/r/w/q]`):
      - **`[t]`** — re-read `coverage-gap-ranking.json` and re-order the
        remaining Story set into its rank order (Phase 4's rule, applied to
-       what is left) before the next Story's `/build`. A remaining Story whose
+       what is left) before the next Story's `/builder`. A remaining Story whose
        target module reads `seam: absent` under `refactor-mode: no-refactor` is
        re-classified **REFACTOR_REQUIRED for Phase 6 rather than retried** —
        retrying it under no-refactor is what produced the flat streak.
