@@ -15,7 +15,7 @@ color: >-
 
 Role: orchestrator. This command implements an approved plan — it does not create plans or specs.
 
-You have been invoked with the `/builder` command.
+You have been invoked with the `/builder` command or started via a user message while in Builder agent mode
 
 ## Orchestrator constraints
 
@@ -70,11 +70,17 @@ were flagged). An interactive `override` (user overrides the reviewer's findings
 logged as `type: "override"` instead, with `proposed` recording the reviewer's
 flagged concern and `description` recording the user's decision to proceed anyway.
 
-### 4. Implement each step
+### 4. Check git status
+
+Run `git status` to see if there are pending changes. If so then first ask the human to either resolve or approve. In case of approval append an `approval` entry to
+`metrics/config-changelog.jsonl` per the [human-oversight-protocol § Audit trail](.opencode/human-oversight-protocol/SKILL.md#audit-trail).
+Update the plan file **Pre implementation commit** to the current commit hash. after the human resolved or approved.
+
+### 5. Implement each step
 
 Work the plan **wave by wave** and **slice by slice**. Within a wave, build slices sequentially.
 
-For each step within a slice, dispatch implementation to be sone by the software-engineer subagent (`@software-engineer`). Pass the implementer its step **and the slice's Gherkin scenario(s)** — the scenarios are the behavioral contract the step's test must satisfy.
+For each step within a slice, dispatch implementation to be done by the software-engineer subagent (`@software-engineer`). Pass the implementer its step **and the slice's Gherkin scenario(s)** — the scenarios are the behavioral contract the step's test must satisfy.
 
 Within the per-behavior mini-cycle below, repeated Write/Edit calls can race a `PostToolUse` hook that rewrites files (e.g., a formatter): an `Edit` failing on a stale `old_string` is expected to self-correct by re-`Read`ing the file before the next `Edit` attempt, not to escalate immediately.
 
@@ -87,7 +93,7 @@ Work each step **one behavior at a time** — never all the code then all the te
 
    **Before each repair iteration** (here and in the review-fix loop, sub-step 4), read `.opencode/knowledge/failure-routing.md` and classify the failing output/exit code by its regex table — deterministic pattern match only, no LLM call, no extra dispatch. Follow the matched route (inline fix / systematic-debugging / test-generation / security-engineer dispatch / human arbitration); `unclassified` falls through to the generic loop below, unchanged. A route switch spends from the same iteration budget — it never resets or raises the cap.
 
-   **2a. Repair loop on failure — failure-signature dead-end detection (issue #864).** Whichever route the classification above sends the failure down, repair it in place rather than handing back a bare failure:
+   **2a. Repair loop on failure — failure-signature dead-end detection.** Whichever route the classification above sends the failure down, repair it in place rather than handing back a bare failure:
 
    - **Compute a failure signature after every repair iteration** (an edit followed by a re-run): the pair of (1) the sorted, deduplicated set of failing test identifiers, using the runner's native IDs (pytest node IDs, jest/vitest full test names, `go test` names, etc.), and (2) the error class per failing test (assertion failure vs. exception type vs. compile/collection error, e.g. `AssertionError`, `TypeError`, `SyntaxError`).
    - **Normalize before comparing.** Strip volatile output first — timestamps, durations, memory addresses, temp paths, PIDs/ports, random seeds — so two runs identical except for that noise produce the same signature. Never compare raw output.
@@ -122,7 +128,7 @@ Work each step **one behavior at a time** — never all the code then all the te
 
    `outcome` is `no-op` when the checkpoint passed clean (found nothing), `fixed` when it found and auto-fixed actionable issues, `escalated` when the loop didn't converge. `severity_breakdown` splits `issues_found` by severity (`errors`/`warnings`/`suggestions`, the same enum as `/code-review`), so `/harness-audit` Step 3 can flag a lens producing mostly minor findings — the three counts must sum to `issues_found` (#1256). This is the sensor that tells a build where review caught a real defect from one where every loop passed no-op — it turns the pipeline's "value untested" into "value measured" and feeds the plan/step tiering decisions. Disable with `DEV_TEAM_REVIEW_VALUE=off`.
 
-### 4.9. Verify runtime behavior before the slice is done (issue #727)
+### 5.1 Verify runtime behavior before the slice is done
 
 A "done" step that only passed its own tests is not the same as a feature that works — a red suite catches structural regressions, not "it fails the first time someone actually runs it." Once a slice's steps are all `[x]` (sub-step 5) and its review checkpoint(s) have run (sub-steps 4/6), decide whether the slice has a runtime surface to exercise **before the slice may be marked `[x]` complete**:
 
@@ -138,15 +144,9 @@ A "done" step that only passed its own tests is not the same as a feature that w
 
    `outcome` is `ran` (`/verify` executed and passed), `skipped` (no runtime surface in the diff — `reason` states why, e.g. `"tests-only"` or `"docs-only"`), or `failed-then-fixed` (`/verify` failed at least once before the fix landed). `python3 scripts/progress_guardian.py --pre-pr` reads this log: a branch with runtime-surface changes and no matching entry fails the pre-PR gate the same way an incomplete step or a missing commit does.
 
-### 4.10. Run slice invariants (issue #865)
+### 5.2. Per slice commit
 
-When the slice declares `**Invariants:**`, run them **after** the slice's own suite is green (sub-step 5) and its review checkpoint(s) have run (sub-steps 4/6) — invariants check what must stay green *beyond* the slice's new acceptance tests, so they gate on top of everything else, not instead of it:
-
-```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/run_invariants.py --plan <plan-file> --slice <id> --repo <worktree>
-```
-
-A non-zero exit **fails the slice gate exactly like a red test** — fix it or escalate (Escalation section below), never step over it, and never flip the slice checkbox to `[x]` until it's green. A slice with no `Invariants` line runs its gate unchanged (the script itself no-ops with "No invariants declared" — nothing to enforce). Invariant commands run as-is from the repo root; the plan author owns their portability, same trust model as the plan's own test commands.
+**After** the slice's own suite is green do a git commit with in the commit message a reference to the plan-file and the slice-id.
 
 ### 5. Run full test suite
 

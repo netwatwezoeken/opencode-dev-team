@@ -12,12 +12,7 @@ Use this structure when writing the plan file.
 <!-- Recorded once at plan creation (detected convention, operator answer, or
      headless default). Re-runs honor this line without re-prompting; editing
      it is the supported way to change the decision. -->
-**Scope enforcement**: <freeze | none> <!-- OPTIONAL. Omit or set `none` for
-     today's behavior. `freeze` opts every slice declaring `**Files:**` into
-     `/builder` auto-freezing its worktree to the declared scope at dispatch
-     (see Slice 2's `**Files:**` line below) — declared Files alone, without
-     this line, only feeds `plan_waves.py`'s scope-mismatch warnings, never
-     freeze. -->
+**Rollback point:** <commit -sha> <!-- OPTIONAL until implementation starts. A concrete commit SHA befor changes were made. -->
 
 ## Goal
 
@@ -78,20 +73,7 @@ Feature: <feature name>
 **Depends-on:** 1
 **Files:** `path/to/other.ts`
 **Invariants:** `<runnable shell command>`, `<another command>`
-**Rollback point:** slice-start
-<!-- All three of Files/Invariants/Rollback point are OPTIONAL — a slice
-     that omits them parses, reviews, and builds exactly as today.
-     - **Files**: declared write scope for the slice (glob patterns
-       accepted, e.g. `src/auth/**`). Feeds `plan_waves.py`'s
-       declared-vs-inferred scope-mismatch check; only auto-freezes when
-       the plan sets `**Scope enforcement:** freeze` above.
-     - **Invariants**: runnable shell commands (exit 0 = green) that must
-       stay green *beyond* this slice's own new acceptance tests — run by
-       `/builder`'s slice gate after the slice's own suite passes.
-     - **Rollback point**: the commit boundary to revert to if the slice
-       dead-ends — `slice-start` (default: HEAD at slice dispatch),
-       `wave-start`, `plan-start`, or an explicit ref. `/builder` resolves it
-       to a concrete SHA at dispatch and records it. -->
+**Rollback point:** <commit -sha> <!-- a concrete commit SHA befor changes were made. -->
 
 **Behavior:**
 

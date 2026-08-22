@@ -17,3 +17,5 @@
     - `CONTRIBUTING.md`
 - `hooks/verify_guard.py`
 - `build_slice_scope.py`
+- PostToolUse
+- progress_guardian.py

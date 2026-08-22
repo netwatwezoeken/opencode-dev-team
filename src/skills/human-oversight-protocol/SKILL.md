@@ -161,8 +161,8 @@ agent had decided; `description` records the human's substituted decision,
 matching the existing `override: [what was decided] → [what should be done
 instead]` grammar. Both fields must be reconstructable from the entry alone.
 
-**Non-interactive gates write identically.** When a gate auto-proceeds (`--yes`,
-`DEV_TEAM_AUTO_APPROVE=1`, or no TTY — see `/planner` and `/builder`), the entry
+**Non-interactive gates write identically.** When a gate auto-proceeds (`--yes`
+, or no TTY — see `/planner` and `/builder`), the entry
 carries the same three fields; only `description`/`trigger` reflect the bypass
 (e.g. `"description": "Auto-approved (non-interactive) — no human gate"`).
 Unattended approvals are exactly where after-the-fact audit matters most.

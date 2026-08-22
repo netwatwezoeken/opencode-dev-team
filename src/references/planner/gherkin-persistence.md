@@ -31,7 +31,7 @@ after approval.
    path, state the rejection reason and re-prompt;
    the re-prompt accepts `y` or `n` as an escape from retrying a custom path.
 5. **No signal + non-interactive** (the same triad step 6 uses: `--yes`,
-   `DEV_TEAM_AUTO_APPROVE=1`, or no usable TTY) → do **not** block: log
+   or no usable TTY) → do **not** block: log
    *"skipping the Gherkin persistence prompt (non-interactive) — plan file only"*
    and record `plan-file-only`.
 6. **Record and echo.** Write the resolved decision into the plan's

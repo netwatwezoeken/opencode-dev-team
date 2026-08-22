@@ -93,7 +93,7 @@ vs. overwrite an existing tracked artifact" axis; applied here:
 
 - **No existing file, or overwrite chosen** — invoke `/mutation-testing --baseline --workflow test-improve` and persist the result (below).
 - **Existing file, interactive session** — prompt keep/overwrite (default keep). An answer that is neither "keep" nor "overwrite" (case-insensitive) re-prompts with the identical choice — never falls back silently to either option, no retry limit, no timeout.
-- **Existing file, non-interactive** (no usable TTY, or `DEV_TEAM_AUTO_APPROVE=1`) — keep the existing baseline automatically; both log the auto-decision and echo it to Phase 2's own progress output, naming the reused baseline's `captured_at` — reporting parity with the coverage-baseline case, not a silent reuse.
+- **Existing file, non-interactive** (no usable TTY) — keep the existing baseline automatically; both log the auto-decision and echo it to Phase 2's own progress output, naming the reused baseline's `captured_at` — reporting parity with the coverage-baseline case, not a silent reuse.
 - **Existing file is malformed or corrupt** (fails to parse as JSON — e.g. left over from a prior interrupted write) — treat it as absent, never as a baseline to keep. Emit a warning naming why a fresh capture is happening, then invoke `/mutation-testing --baseline --workflow test-improve`.
 - **On keep** — do not invoke `/mutation-testing --baseline`; reuse the existing file's fields and report its `captured_at` instead of a freshly captured timestamp.
 
