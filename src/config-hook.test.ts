@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { configHook } from "./config-hook.js";
-import { handleTransitionCommand, type TuiCompanionDeps } from "./tui.js";
-import {
-  WORKFLOW_TRANSITION_ACKNOWLEDGED,
-  WORKFLOW_TRANSITION_FAILED,
-  WORKFLOW_TRANSITION_REQUESTED,
-} from "./workflow-events.js";
 import type { Logger } from "./logger.js";
 
 function logger(): Logger {
@@ -90,70 +84,6 @@ describe("configHook — Slice 2 Step 2.1: custom primary agents remain visible"
       .filter(([, a]) => a.hidden === true)
       .map(([name]) => name);
     expect(hiddenAgents.sort()).toEqual(["build", "plan"]);
-  });
-});
-
-describe("configHook + handleTransitionCommand composed integration — AC4", () => {
-  it("specs→planner with ring [specs, review, planner, builder] dispatches 2 cycles, acks, no failure", async () => {
-    const config = await runHook({
-      review: { mode: "primary" },
-    });
-
-    const ringNames = ["specs", "review", "planner", "builder"] as const;
-    for (const name of ringNames) {
-      expect(
-        config.agent[name],
-        `agent '${name}' must exist in post-hook config`,
-      ).toBeDefined();
-    }
-    const agentList: Array<TestAgentEntry & { name: string }> = ringNames.map(
-      (name) => ({
-        name,
-        ...config.agent[name]!,
-      }),
-    );
-    const visibleNames = agentList
-      .filter((a) => a.mode !== "subagent" && a.hidden !== true)
-      .map((a) => a.name);
-    expect(visibleNames).toEqual(["specs", "review", "planner", "builder"]);
-
-    const dispatchAgentCycle = vi.fn().mockReturnValue({ ok: true });
-    const publishCommand = vi.fn().mockResolvedValue(undefined);
-
-    const deps: TuiCompanionDeps = {
-      listAgents: vi.fn().mockResolvedValue(agentList),
-      dispatchAgentCycle,
-      publishCommand,
-      toast: vi.fn(),
-    };
-
-    const payload = {
-      requestId: "req-compose-1",
-      nextStep: "planner",
-      sourceAgent: "specs",
-      targetAgent: "planner" as const,
-      reference: "plans/test.md",
-    };
-
-    await handleTransitionCommand(
-      `${WORKFLOW_TRANSITION_REQUESTED}:${JSON.stringify(payload)}`,
-      deps,
-    );
-
-    expect(dispatchAgentCycle).toHaveBeenCalledTimes(2);
-
-    const publishedCommands: string[] =
-      publishCommand.mock.calls.flat() as string[];
-    expect(
-      publishedCommands.some((c) =>
-        c.startsWith(`${WORKFLOW_TRANSITION_ACKNOWLEDGED}:`),
-      ),
-    ).toBe(true);
-    expect(
-      publishedCommands.some((c) =>
-        c.startsWith(`${WORKFLOW_TRANSITION_FAILED}:`),
-      ),
-    ).toBe(false);
   });
 });
 

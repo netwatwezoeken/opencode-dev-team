@@ -4,7 +4,7 @@ export const WIREMOCK_BASE_URL = 'http://localhost:8080';
 export const WIREMOCK_OPENAI_BASE_URL = `${WIREMOCK_BASE_URL}/v1`;
 export const WIREMOCK_PROVIDER_ID = 'mock-provider';
 export const DEFAULT_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'default-model' } as const;
-export const SPECS_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'mocked-model-id' } as const;
+export const SPECS_MODEL = { providerID: WIREMOCK_PROVIDER_ID, modelID: 'specs-model-id' } as const;
 
 export type MessageWithParts = {
   info: Message;

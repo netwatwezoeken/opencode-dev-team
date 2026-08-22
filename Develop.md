@@ -20,7 +20,9 @@ Create a separate test project with an `opencode.json` file:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["<test-project>/.opencode/node_modules/opencode-dev-team/dist/index.js"]
+  "plugin": [
+    "<test-project>/.opencode/node_modules/opencode-dev-team/dist/index.js"
+  ]
 }
 ```
 
@@ -57,6 +59,11 @@ The test project should have this structure:
 
 Fully quit and restart opencode after changing either config or rebuilding the
 package.
+
+Workflow transitions are handled by the TUI plugin. It creates and selects a
+new session, cycles the TUI primary agent to the next workflow agent, and does
+not submit a command or prompt. Planner and builder therefore start with clean
+conversation context.
 
 ## Testing
 

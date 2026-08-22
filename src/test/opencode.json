@@ -6,7 +6,9 @@
       {
         "model": {
           "default": "mock-provider/default-model",
-          "specs": "mock-provider/mocked-model-id"
+          "specs": "mock-provider/specs-model-id",
+          "planner": "mock-provider/planner-model-id",
+          "builder": "mock-provider/builder-model-id"
         }
       }
     ]

@@ -4,11 +4,11 @@ An agentic development team for [opencode](https://opencode.ai), delivered as a 
 
 It provides a human-in-the-loop workflow with dedicated agents for three phases:
 
-| Phase | Command | Purpose |
-| --- | --- | --- |
-| Specs | `/specs` | Resolve ambiguity and define intent, architecture, and acceptance criteria. |
-| Planner | `/planner` | Decompose the feature into reviewed, testable vertical slices. |
-| Builder | `/builder` | Implement the approved plan in small, verified batches. |
+| Phase   | Command    | Purpose                                                                     |
+| ------- | ---------- | --------------------------------------------------------------------------- |
+| Specs   | `/specs`   | Resolve ambiguity and define intent, architecture, and acceptance criteria. |
+| Planner | `/planner` | Decompose the feature into reviewed, testable vertical slices.              |
+| Builder | `/builder` | Implement the approved plan in small, verified batches.                     |
 
 Each phase advances only after its quality and approval gates pass.
 
@@ -37,7 +37,7 @@ the package to both files using the **same package version**.
 
 Then fully quit and restart opencode. Configuration and plugins are loaded only
 at startup. Loading `opencode-dev-team` only in `opencode.json` enables the
-workflow tools but cannot switch the active TUI agent, so transitions report
+workflow tools but cannot create and select clean TUI sessions, so transitions report
 that the companion TUI plugin is not loaded.
 
 opencode installs the package automatically. On first use, the plugin installs its bundled agents, commands, knowledge, references, and skills into the project's `.opencode/` directory.
@@ -72,13 +72,16 @@ Start a workflow in opencode:
 
 The specs agent creates a specification under `docs/specs/`. After approval, the planner produces an implementation plan under `plans/`, and the builder implements it slice by slice.
 
-### TUI agent cycling
+### Clean-session handoffs
 
 The server plugin requests a named workflow transition and waits for the TUI
-companion to acknowledge it. The companion dispatches `agent.cycle` inside the
-TUI until the active prompt agent reaches the requested workflow agent. The
-plugin constrains the visible cycle to `specs`, `planner`, and `builder` and
-uses `specs` as the default agent.
+companion to acknowledge it. The companion creates a new session, selects it,
+and dispatches `agent.cycle` until the selected primary agent reaches the next
+workflow agent. The approved artifact
+slug is used in the session title, for example `planner: <slug>` or
+`builder: <slug>`. The plugin does not submit a command or prompt automatically,
+so each phase starts without the previous phase's conversation context.
+The plugin uses `specs` as the default agent.
 
 ## Status
 

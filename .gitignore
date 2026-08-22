@@ -7,3 +7,6 @@ node_modules
 dist
 opencode-dev-team-*.tgz
 .idea
+src/test/integration/.opencode/knowledge
+src/test/integration/.opencode/references
+src/test/integration/.opencode/skills

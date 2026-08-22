@@ -15,7 +15,7 @@ describe('dev-team headless harness', () => {
     harness?.dispose();
   });
 
-  test.each(['specs', 'planner'])('the /%s command is registered', async (name) => {
+  test.each(['specs', 'planner', 'builder'])('the /%s command is registered', async (name) => {
     const commands = await listCommands(harness.client);
     expect(commands).toContain(name);
   });
@@ -36,7 +36,7 @@ describe('dev-team headless harness', () => {
       timeoutMs: 10_000,
     });
     
-    expectAgentAndModel(messages, { agent: 'specs', modelID: 'mocked-model-id' });
+    expectAgentAndModel(messages, { agent: 'specs', modelID: 'specs-model-id' });
   }, 20_000);
 });
 
@@ -86,24 +86,4 @@ describe('workflow transition signals (integration)', () => {
     expect(advanceCall!.output).toContain('no TUI companion acknowledged');
     expect(advanceCall!.output).toContain('planner');
   }, 40_000);
-
-  test('approved builder final step: tool result reports workflow complete', async () => {
-    // WireMock stub "workflow-advance-builder" body-matches on "advance-builder-integration-trigger"
-    // and returns an LLM response that calls workflow_advance(approve:true, current:"builder").
-    // builder is the final step — no transition, no coordinator call — just the completion message.
-    const session = await harness.client.session.create({ body: { title: 'advance builder final' } });
-    expect(session.data?.id).toBeTruthy();
-
-    const messages = await runTurn(harness.client, harness.events, {
-      sessionID: session.data!.id,
-      text: 'advance-builder-integration-trigger: advance from builder',
-      timeoutMs: 15_000,
-    });
-
-    const calls = toolCalls(messages, harness.events.all());
-    const advanceCall = calls.find((c) => c.name === 'workflow_advance');
-    expect(advanceCall, 'workflow_advance tool call not found in messages').toBeDefined();
-    expect(advanceCall!.output).toContain('Workflow complete');
-    expect(advanceCall!.output).toContain('specs → planner → builder');
-  }, 30_000);
 });

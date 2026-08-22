@@ -20,7 +20,7 @@ function makeLogger(): Logger {
 function makeClient() {
   return {
     session: {
-      promptAsync: vi.fn().mockResolvedValue(undefined),
+      promptAsync: vi.fn(),
       summarize: vi.fn(),
     },
   };
@@ -42,13 +42,20 @@ function makeCoordinator(
   return { select: vi.fn().mockResolvedValue(outcome) };
 }
 
+function acknowledged(
+  targetAgent: "specs" | "planner" | "builder",
+): TransitionOutcome {
+  return {
+    status: "acknowledged",
+    targetAgent,
+    sessionID: `${targetAgent}-session`,
+  };
+}
+
 describe("workflow_advance", () => {
-  it("requests exact specs to planner TUI selection and auto-prompts planner", async () => {
+  it("requests a clean planner handoff with the approved spec reference", async () => {
     const client = makeClient();
-    const coordinator = makeCoordinator({
-      status: "acknowledged",
-      targetAgent: "planner",
-    });
+    const coordinator = makeCoordinator(acknowledged("planner"));
     const tools = workflowTools(client as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
       { approve: true, current: "specs", reference: "docs/specs/a.md" },
@@ -64,64 +71,42 @@ describe("workflow_advance", () => {
       } satisfies WorkflowSelectionInput,
       "/project",
     );
-    expect(result).toContain('TUI primary agent switched to "planner"');
-
-    expect(client.session.promptAsync).toHaveBeenCalledTimes(1);
-    expect(client.session.promptAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        throwOnError: true,
-        body: expect.objectContaining({
-          agent: "planner",
-          parts: [{ type: "text", text: "build the plan docs/specs/a.md" }],
-        }),
-      }),
+    expect(result).toBe(
+      '"specs" approved. Started "planner" in a clean session.',
     );
-    const advanceBody = (client.session.promptAsync as Mock).mock.calls[0][0]
-      .body;
-    expect("model" in advanceBody).toBe(false);
+    expect(client.session.promptAsync).not.toHaveBeenCalled();
+    expect(client.session.summarize).not.toHaveBeenCalled();
   });
 
-  it("requests exact planner to builder TUI selection and auto-prompts builder", async () => {
+  it("requests a clean builder handoff with the approved plan reference", async () => {
     const client = makeClient();
-    const coordinator = makeCoordinator({
-      status: "acknowledged",
-      targetAgent: "builder",
-    });
+    const coordinator = makeCoordinator(acknowledged("builder"));
     const tools = workflowTools(client as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
       { approve: true, current: "planner", reference: "plans/a.md" },
       makeCtx("planner") as any,
     );
+
     expect(coordinator.select).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceAgent: "planner",
         targetAgent: "builder",
+        reference: "plans/a.md",
       }),
       "/project",
     );
-    expect(result).toContain('switched to "builder"');
-
-    expect(client.session.promptAsync).toHaveBeenCalledTimes(1);
-    expect(client.session.promptAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        throwOnError: true,
-        body: expect.objectContaining({
-          agent: "builder",
-          parts: [{ type: "text", text: "build the first slice plans/a.md" }],
-        }),
-      }),
+    expect(result).toBe(
+      '"planner" approved. Started "builder" in a clean session.',
     );
-    const builderBody = (client.session.promptAsync as Mock).mock.calls[0][0]
-      .body;
-    expect("model" in builderBody).toBe(false);
+    expect(client.session.promptAsync).not.toHaveBeenCalled();
   });
 
-  it("reports companion failure without claiming success and sends no prompt", async () => {
+  it("reports companion failure without claiming that a clean session started", async () => {
     const client = makeClient();
     const coordinator = makeCoordinator({
       status: "failed",
       targetAgent: "builder",
-      message: "agent.cycle inactive",
+      message: "session creation failed",
     });
     const tools = workflowTools(client as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
@@ -129,172 +114,80 @@ describe("workflow_advance", () => {
       makeCtx("planner") as any,
     );
     expect(result).toMatch(/^\[ERROR\]/);
-    expect(result).toContain("agent.cycle inactive");
-    expect(result).not.toContain("switched to");
-    expect(client.session.promptAsync).not.toHaveBeenCalled();
+    expect(result).toContain("session creation failed");
+    expect(result).not.toContain("Started");
   });
 
-  it("reports timeout without claiming success and sends no prompt", async () => {
-    const client = makeClient();
+  it("reports timeout without claiming that a clean session started", async () => {
     const coordinator = makeCoordinator({
       status: "timeout",
       targetAgent: "planner",
     });
-    const tools = workflowTools(client as any, makeLogger(), coordinator);
+    const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
       { approve: true, current: "specs", reference: "r" },
       makeCtx("specs") as any,
     );
     expect(result).toMatch(/^\[ERROR\]/);
     expect(result).toContain("no TUI companion acknowledged");
-    expect(result).not.toContain("switched to");
-    expect(client.session.promptAsync).not.toHaveBeenCalled();
+    expect(result).not.toContain("Started");
   });
 
   it("does nothing when approval is false", async () => {
-    const client = makeClient();
-    const coordinator = makeCoordinator({
-      status: "acknowledged",
-      targetAgent: "builder",
-    });
-    const tools = workflowTools(client as any, makeLogger(), coordinator);
+    const coordinator = makeCoordinator(acknowledged("builder"));
+    const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
       { approve: false, current: "planner", reference: "r" },
       makeCtx("planner") as any,
     );
     expect(coordinator.select).not.toHaveBeenCalled();
-    expect(client.session.promptAsync).not.toHaveBeenCalled();
     expect(result).toBe(
       'Step "planner" not approved. Staying on the current step.',
     );
   });
 
   it("does nothing after the final builder step", async () => {
-    const client = makeClient();
-    const coordinator = makeCoordinator({
-      status: "acknowledged",
-      targetAgent: "builder",
-    });
-    const tools = workflowTools(client as any, makeLogger(), coordinator);
+    const coordinator = makeCoordinator(acknowledged("builder"));
+    const tools = workflowTools(makeClient() as any, makeLogger(), coordinator);
     const result = await tools.workflow_advance.execute(
       { approve: true, current: "builder", reference: "r" },
       makeCtx("builder") as any,
     );
     expect(coordinator.select).not.toHaveBeenCalled();
-    expect(client.session.promptAsync).not.toHaveBeenCalled();
     expect(result).toBe(
       "Workflow complete. All steps (specs → planner → builder) approved.",
-    );
-  });
-
-  // --- Edge cases for the fire-and-forget auto-prompt ---
-
-  it("empty reference: prompt text is instruction plus trailing space", async () => {
-    const client = makeClient();
-    const coordinator = makeCoordinator({
-      status: "acknowledged",
-      targetAgent: "planner",
-    });
-    const tools = workflowTools(client as any, makeLogger(), coordinator);
-    await tools.workflow_advance.execute(
-      { approve: true, current: "specs", reference: "" },
-      makeCtx("specs") as any,
-    );
-    expect(client.session.promptAsync).toHaveBeenCalledTimes(1);
-    expect(client.session.promptAsync).toHaveBeenCalledWith(
-      expect.objectContaining({
-        throwOnError: true,
-        body: expect.objectContaining({
-          parts: [{ type: "text", text: "build the plan " }],
-        }),
-      }),
-    );
-  });
-
-  it("fire-and-forget: never-settling prompt does not block advance return", async () => {
-    const client = {
-      session: {
-        promptAsync: vi.fn().mockReturnValue(
-          new Promise(() => {
-            /* never settles */
-          }),
-        ),
-        summarize: vi.fn(),
-      },
-    };
-    const coordinator = makeCoordinator({
-      status: "acknowledged",
-      targetAgent: "planner",
-    });
-    const tools = workflowTools(client as any, makeLogger(), coordinator);
-    const result = await tools.workflow_advance.execute(
-      { approve: true, current: "specs", reference: "docs/specs/a.md" },
-      makeCtx("specs") as any,
-    );
-    expect(result).toContain('switched to "planner"');
-  });
-
-  it("prompt rejection: advance returns success and logs with correct key and payload", async () => {
-    const logger = makeLogger();
-    const client = {
-      session: {
-        promptAsync: vi.fn().mockRejectedValue(new Error("network failure")),
-        summarize: vi.fn(),
-      },
-    };
-    const coordinator = makeCoordinator({
-      status: "acknowledged",
-      targetAgent: "planner",
-    });
-    const tools = workflowTools(client as any, logger, coordinator);
-    const result = await tools.workflow_advance.execute(
-      { approve: true, current: "specs", reference: "docs/specs/a.md" },
-      makeCtx("specs") as any,
-    );
-    // Flush microtask queue so .catch fires
-    await Promise.resolve();
-    expect(result).toContain('switched to "planner"');
-    expect(result).not.toMatch(/^\[ERROR\]/);
-    expect(logger.error).toHaveBeenCalledWith(
-      "workflow_advance promptAsync failed",
-      expect.objectContaining({ error: "network failure" }),
     );
   });
 });
 
 describe("workflow_start", () => {
   it.each(["specs", "planner", "builder"] as const)(
-    "selects %s in the TUI and preserves promptAsync startup",
+    "starts %s in a clean session",
     async (start) => {
       const client = makeClient();
-      const coordinator = makeCoordinator({
-        status: "acknowledged",
-        targetAgent: start,
-      });
+      const coordinator = makeCoordinator(acknowledged(start));
       const tools = workflowTools(client as any, makeLogger(), coordinator);
       const result = await tools.workflow_start.execute(
         { start },
         makeCtx("build") as any,
       );
 
-      expect(client.session.promptAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          throwOnError: true,
-          body: expect.objectContaining({ agent: start }),
-        }),
-      );
       expect(coordinator.select).toHaveBeenCalledWith(
-        expect.objectContaining({
+        {
+          nextStep: start,
           sourceAgent: "build",
           targetAgent: start,
-        }),
+          reference: "",
+        },
         "/project",
       );
-      expect(result).toContain(`TUI primary agent switched to "${start}"`);
+      expect(result).toBe(`Starting the "${start}" step in a clean session.`);
+      expect(client.session.promptAsync).not.toHaveBeenCalled();
+      expect(client.session.summarize).not.toHaveBeenCalled();
     },
   );
 
-  it("keeps prompt startup when the companion times out", async () => {
+  it("reports a timeout without mutating the current session", async () => {
     const client = makeClient();
     const coordinator = makeCoordinator({
       status: "timeout",
@@ -305,8 +198,8 @@ describe("workflow_start", () => {
       { start: "specs" },
       makeCtx("build") as any,
     );
-    expect(client.session.promptAsync).toHaveBeenCalled();
     expect(result).toContain("[ERROR]");
-    expect(result).toContain("Cycle the TUI agent manually");
+    expect(client.session.promptAsync).not.toHaveBeenCalled();
+    expect(client.session.summarize).not.toHaveBeenCalled();
   });
 });

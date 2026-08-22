@@ -5,11 +5,6 @@ import { createTransitionPayload } from "./workflow-events.js";
 
 export type { Step } from "./workflow-events.js";
 
-const PROMPT: Partial<Record<Step, string>> = {
-  planner: "build the plan",
-  builder: "build the first slice",
-};
-
 export const NEXT: Record<Step, Step | null> = {
   specs: "planner",
   planner: "builder",
@@ -30,55 +25,24 @@ function formatTransitionOutcome(
   },
 ): string {
   if (outcome.status === "acknowledged") {
-    return `"${step}" approved. TUI primary agent switched to "${outcome.targetAgent}".`;
+    return `"${step}" approved. Started "${outcome.targetAgent}" in a clean session.`;
   }
   if (outcome.status === "failed") {
-    return `[ERROR] "${step}" approved but transition to "${next}" failed: ${outcome.message ?? "unknown error"}. Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
+    return `[ERROR] "${step}" approved but starting "${next}" in a clean session failed: ${outcome.message ?? "unknown error"}. Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
   }
   // timeout
   return `[ERROR] "${step}" approved but no TUI companion acknowledged the transition to "${next}". Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
 }
 
-// ---------------------------------------------------------------------------
-// Fire-and-forget prompt helper
-// ---------------------------------------------------------------------------
-
-function firePrompt(
-  client: PluginInput["client"],
-  logger: Logger,
-  ctx: { sessionID: string },
-  opts: {
-    agent: string;
-    text: string;
-    messageKey: string;
-  },
-): void {
-  void client.session
-    .promptAsync({
-      throwOnError: true,
-      path: { id: ctx.sessionID },
-      body: {
-        agent: opts.agent,
-        parts: [{ type: "text", text: opts.text }],
-      },
-    })
-    .catch((error) => {
-      logger.error(opts.messageKey, {
-        error: error instanceof Error ? error.message : String(error),
-        sessionID: ctx.sessionID,
-      });
-    });
-}
-
 export function workflowTools(
-  client: PluginInput["client"],
+  _client: PluginInput["client"],
   logger: Logger,
   coordinator: WorkflowTransitionCoordinator,
 ) {
   return {
     /**
      * Approve the current workflow step and emit a transition event.
-     * The coordinator emits the event and cycles the TUI primary agent once.
+     * The coordinator asks the TUI companion to start the next step in a clean session.
      */
     workflow_advance: tool({
       description: [
@@ -104,7 +68,7 @@ export function workflowTools(
           reference,
           sessionID: ctx.sessionID,
         });
-        const step = current as Step;
+        const step = ctx.agent as Step;
 
         if (!approve) {
           return `Step "${step}" not approved. Staying on the current step.`;
@@ -130,14 +94,6 @@ export function workflowTools(
           return `[ERROR] "${step}" workflow transition event could not be published: ${msg}. Load the companion TUI plugin and restart opencode, then run workflow_status to confirm the current step.`;
         }
 
-        if (outcome.status === "acknowledged" && PROMPT[next] !== undefined) {
-          firePrompt(client, logger, ctx, {
-            agent: next,
-            text: PROMPT[next] + " " + reference,
-            messageKey: "workflow_advance promptAsync failed",
-          });
-        }
-
         return formatTransitionOutcome(step, next, outcome);
       },
     }),
@@ -153,18 +109,17 @@ export function workflowTools(
           .enum(["specs", "planner", "builder"])
           .describe("The step you believe is currently active."),
       },
-      async execute({ current }) {
-        const next = NEXT[current as Step];
+      async execute({ current }, ctx) {
+        const next = NEXT[ctx.agent as Step];
         return [
-          `Active step: ${current}`,
+          `Active step: ${ctx.agent}`,
           next ? `Next step: ${next}` : "This is the final step.",
         ].join("\n");
       },
     }),
 
     /**
-     * Starts the workflow at the given step by prompting that step's agent,
-     * then coordinating the TUI selection from the caller's current agent.
+     * Starts the workflow at the given step in a clean TUI session.
      */
     workflow_start: tool({
       description: "Start the workflow.",
@@ -174,13 +129,6 @@ export function workflowTools(
           .describe("The step to start from."),
       },
       async execute({ start }, ctx) {
-        client.session.summarize({ path: { id: ctx.sessionID } });
-        firePrompt(client, logger, ctx, {
-          agent: start,
-          text: `I'll start the ${start} process`,
-          messageKey: "workflow_start promptAsync failed",
-        });
-
         try {
           const outcome = await coordinator.select(
             {
@@ -196,14 +144,14 @@ export function workflowTools(
               outcome.status === "failed"
                 ? outcome.message
                 : "no companion ack received";
-            return `[ERROR] Starting the "${start}" step was initiated, but the TUI agent could not be selected: ${reason}. Cycle the TUI agent manually to continue.`;
+            return `[ERROR] Starting the "${start}" step was initiated, but a clean session could not be started: ${reason}. Start a new session and run /${start} manually to continue.`;
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          return `[ERROR] Starting the "${start}" step was initiated, but the TUI agent cycle failed: ${message}. Cycle the TUI agent manually to continue.`;
+          return `[ERROR] Starting the "${start}" step was initiated, but the clean-session handoff failed: ${message}. Start a new session and run /${start} manually to continue.`;
         }
 
-        return `Starting the "${start}" step now. TUI primary agent switched to "${start}".`;
+        return `Starting the "${start}" step in a clean session.`;
       },
     }),
   };

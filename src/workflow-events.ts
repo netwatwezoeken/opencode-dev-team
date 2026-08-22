@@ -1,14 +1,15 @@
-export type Step = 'specs' | 'planner' | 'builder';
+export type Step = "specs" | "planner" | "builder";
 
-export const WORKFLOW_AGENTS = ['specs', 'planner', 'builder'] as const;
-export const WORKFLOW_TRANSITION_REQUESTED = 'workflow.transition.requested';
-export const WORKFLOW_TRANSITION_ACKNOWLEDGED = 'workflow.transition.acknowledged';
-export const WORKFLOW_TRANSITION_FAILED = 'workflow.transition.failed';
+export const WORKFLOW_AGENTS = ["specs", "planner", "builder"] as const;
+export const WORKFLOW_TRANSITION_REQUESTED = "workflow.transition.requested";
+export const WORKFLOW_TRANSITION_ACKNOWLEDGED =
+  "workflow.transition.acknowledged";
+export const WORKFLOW_TRANSITION_FAILED = "workflow.transition.failed";
 export const DEFAULT_TRANSITION_TIMEOUT_MS = 10_000;
 
-export const STEP_AGENT: Record<Exclude<Step, 'builder'>, Step> = {
-  specs: 'planner',
-  planner: 'builder',
+export const STEP_AGENT: Record<Exclude<Step, "builder">, Step> = {
+  specs: "planner",
+  planner: "builder",
 };
 
 export interface WorkflowSelectionInput {
@@ -25,6 +26,7 @@ export interface WorkflowTransitionRequestedPayload extends WorkflowSelectionInp
 export interface WorkflowTransitionAcknowledgedPayload {
   requestId: string;
   targetAgent: Step;
+  sessionID: string;
 }
 
 export interface WorkflowTransitionFailedPayload {
@@ -34,12 +36,15 @@ export interface WorkflowTransitionFailedPayload {
 }
 
 export type TransitionOutcome =
-  | { status: 'acknowledged'; targetAgent: Step }
-  | { status: 'failed'; targetAgent: Step; message: string }
-  | { status: 'timeout'; targetAgent: Step };
+  | { status: "acknowledged"; targetAgent: Step; sessionID: string }
+  | { status: "failed"; targetAgent: Step; message: string }
+  | { status: "timeout"; targetAgent: Step };
 
 export interface WorkflowTransitionCoordinator {
-  select(input: WorkflowSelectionInput, directory: string): Promise<TransitionOutcome>;
+  select(
+    input: WorkflowSelectionInput,
+    directory: string,
+  ): Promise<TransitionOutcome>;
 }
 
 export function createTransitionPayload(
@@ -47,17 +52,17 @@ export function createTransitionPayload(
   sourceAgent: string,
   reference: string,
 ): WorkflowSelectionInput | null {
-  if (currentStep === 'builder') return null;
+  if (currentStep === "builder") return null;
   const nextStep = STEP_AGENT[currentStep];
   return { nextStep, sourceAgent, targetAgent: nextStep, reference };
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }
 
 function isStep(value: unknown): value is Step {
-  return typeof value === 'string' && WORKFLOW_AGENTS.includes(value as Step);
+  return typeof value === "string" && WORKFLOW_AGENTS.includes(value as Step);
 }
 
 export function isTransitionRequestedPayload(
@@ -65,11 +70,11 @@ export function isTransitionRequestedPayload(
 ): value is WorkflowTransitionRequestedPayload {
   if (!isObject(value)) return false;
   return (
-    typeof value.requestId === 'string' &&
+    typeof value.requestId === "string" &&
     isStep(value.nextStep) &&
-    typeof value.sourceAgent === 'string' &&
+    typeof value.sourceAgent === "string" &&
     isStep(value.targetAgent) &&
-    typeof value.reference === 'string'
+    typeof value.reference === "string"
   );
 }
 
@@ -77,7 +82,11 @@ export function isTransitionAcknowledgedPayload(
   value: unknown,
 ): value is WorkflowTransitionAcknowledgedPayload {
   if (!isObject(value)) return false;
-  return typeof value.requestId === 'string' && isStep(value.targetAgent);
+  return (
+    typeof value.requestId === "string" &&
+    isStep(value.targetAgent) &&
+    typeof value.sessionID === "string"
+  );
 }
 
 export function isTransitionFailedPayload(
@@ -85,14 +94,14 @@ export function isTransitionFailedPayload(
 ): value is WorkflowTransitionFailedPayload {
   if (!isObject(value)) return false;
   return (
-    typeof value.requestId === 'string' &&
+    typeof value.requestId === "string" &&
     isStep(value.targetAgent) &&
-    typeof value.message === 'string'
+    typeof value.message === "string"
   );
 }
 
 export class TimeoutCoordinator implements WorkflowTransitionCoordinator {
   async select(input: WorkflowSelectionInput): Promise<TransitionOutcome> {
-    return { status: 'timeout', targetAgent: input.targetAgent };
+    return { status: "timeout", targetAgent: input.targetAgent };
   }
 }

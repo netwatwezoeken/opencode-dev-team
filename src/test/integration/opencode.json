@@ -1,0 +1,38 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+    "permission": {
+    "*": "deny",
+
+    "workflow*": "allow"
+  },
+  "plugin": [
+    [
+      "../../index.ts",
+      {
+        "model": {
+          "default": "mock-provider/default-model",
+          "specs": "mock-provider/specs-model-id",
+          "planner": "mock-provider/planner-model-id",
+          "builder": "mock-provider/builder-model-id"
+        }
+      }
+    ]
+  ],
+  "enabled_providers": ["wiremock", "mock-provider"],
+  "provider": {
+    "mock-provider": {
+      "name": "WireMock (integration tests)",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "apiKey": "wiremock-test-key",
+        "baseURL": "http://localhost:8088/v1"
+      },
+      "models": {
+        "default-model": { "name": "default-model" },
+        "specs-model-id": { "name": "specs-model-id" },
+        "planner-model-id": { "name": "planner-model-id" },
+        "builder-model-id": { "name": "builder-model-id" }
+      }
+    }
+  }
+}
