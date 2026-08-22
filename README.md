@@ -40,7 +40,49 @@ at startup. Loading `opencode-dev-team` only in `opencode.json` enables the
 workflow tools but cannot create and select clean TUI sessions, so transitions report
 that the companion TUI plugin is not loaded.
 
-opencode installs the package automatically. On first use, the plugin installs its bundled agents, commands, knowledge, references, and skills into the project's `.opencode/` directory.
+opencode installs the package automatically. On first use, the plugin installs its 
+bundled agents, commands, knowledge, references, and skills into the project's 
+`.opencode/` directory.
+
+### Model routing
+
+This plugin does model routing. Models can be set per bundled agent or subagent 
+through the plugin options. Use the `provider/model` identifier supported by your 
+opencode installation. A `default` override applies to agents without a more specific
+entry.
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    [
+      "opencode-dev-team",
+      {
+        "model": {
+          "default": "github-copilot/claude-sonnet-4.6",
+          "specs": "github-copilot/claude-opus-4.8",
+          "planner": "github-copilot/claude-opus-4.8",
+          "builder": "github-copilot/claude-sonnet-4.6",
+          "software-engineer": "github-copilot/claude-sonnet-4.6",
+          "complexity-review": "claude-haiku-4.5",
+          "plan-review-acceptance": "github-copilot/claude-sonnet-4.6",
+          "plan-review-design": "github-copilot/claude-sonnet-4.6",
+          "plan-review-strategic": "github-copilot/claude-sonnet-4.6",
+          "plan-review-ux": "github-copilot/claude-sonnet-4.6",
+          "refactor-opportunity-review": "github-copilot/claude-haiku-4.5",
+          "spec-reviewer": "github-copilot/claude-haiku-4.5"
+        }
+      }
+    ]
+  ]
+}
+```
+
+Only entries you need to change are required. Named entries take precedence
+over `default`; omitted entries use opencode's normal model selection.
+
+When completely omitted no model routing takes place and every agent and subagent 
+will use the model that is active at that moment
 
 ### Specfic verion
 
@@ -49,7 +91,7 @@ You can specify a specific version, this includes pre-releases:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-dev-team@0.0.1-alpha011"]
+  "plugin": ["opencode-dev-team@0.0.1"]
 }
 ```
 
@@ -58,7 +100,7 @@ Use the matching package spec in `tui.json`:
 ```json
 {
   "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["opencode-dev-team@0.0.1-alpha011"]
+  "plugin": ["opencode-dev-team@0.0.1"]
 }
 ```
 
